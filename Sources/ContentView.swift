@@ -3023,11 +3023,10 @@ struct ContentView: View {
         view = AnyView(view.onReceive(NotificationCenter.default.publisher(
             for: .browserPortalRegistryDidChange
         )) { notification in
-            guard let webView = notification.object as? WKWebView,
-                  let snapshot = BrowserWindowPortalRegistry.debugSnapshot(for: webView),
-                  snapshot.visibleInUI,
-                  !snapshot.containerHidden,
-                  webView.window != nil else {
+            guard tabManager.workspaceSwitchCoordinator.isMeasuringSwitch,
+                  let webView = notification.object as? WKWebView,
+                  webView.window === (observedWindow ?? tabManager.window),
+                  BrowserWindowPortalRegistry.isPresented(webView) else {
                 return
             }
             tabManager.workspaceSwitchCoordinator.noteBrowserPortalPresented(webView: webView)
@@ -3683,11 +3682,7 @@ struct ContentView: View {
         if let focusedPanelID = workspace.focusedPanelId,
            let browserPanel = workspace.browserPanel(for: focusedPanelID) {
             let webView = browserPanel.webView
-            let snapshot = BrowserWindowPortalRegistry.debugSnapshot(for: webView)
-            let portalPresented =
-                snapshot?.visibleInUI == true &&
-                snapshot?.containerHidden == false &&
-                webView.window != nil
+            let portalPresented = BrowserWindowPortalRegistry.isPresented(webView)
             let interactionReady =
                 window.flatMap { window in
                     window.firstResponder.flatMap {
@@ -3711,7 +3706,7 @@ struct ContentView: View {
         if let target = workspace.focusedTerminalInputTarget() {
             let surface = target.panel.surface
             let hostedView = target.panel.hostedView
-            let portalPresented = Self.terminalPortalIsPresented(hostedView)
+            let portalPresented = TerminalWindowPortalRegistry.isPresented(hostedView)
             let interactionReady = terminalInteractionIsReady(
                 target.panel,
                 in: window
@@ -3812,7 +3807,8 @@ struct ContentView: View {
     }
 
     private func noteTerminalPortalPresentedIfReady(_ hostedView: GhosttySurfaceScrollView) {
-        guard let surface = hostedView.surfaceView.terminalSurface,
+        guard tabManager.workspaceSwitchCoordinator.isMeasuringSwitch,
+              let surface = hostedView.surfaceView.terminalSurface,
               surface.tabId == tabManager.selectedTabId else {
             return
         }
