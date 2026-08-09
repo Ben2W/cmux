@@ -80,6 +80,9 @@ extension Workspace {
         let pidKeys = agentPIDKeysByPanelId[panelId] ?? []
         let lifecycleEventTimes = (agentLifecycleEventTimesByPanelId[panelId] ?? [:])
             .filter { !AgentHibernationLifecycleStatusKeys.isManualKey($0.key) }
+        let lifecycleStates = (agentLifecycleStatesByPanelId[panelId] ?? [:]).filter {
+            !AgentHibernationLifecycleStatusKeys.isManualKey($0.key)
+        }
 
         var agentPIDsForPanel: [String: pid_t] = [:]
         var agentPIDIdentitiesForPanel: [String: AgentPIDProcessIdentity] = [:]
@@ -97,16 +100,20 @@ extension Workspace {
                 statusEntriesForPanel[statusKey] = statusEntry
             }
         }
-        guard !statusEntriesForPanel.isEmpty ||
-              !agentPIDsForPanel.isEmpty ||
-              !pidKeys.isEmpty ||
-              !lifecycleEventTimes.isEmpty else { return nil }
+        guard !statusEntriesForPanel.isEmpty
+                || !agentPIDsForPanel.isEmpty
+                || !pidKeys.isEmpty
+                || !lifecycleStates.isEmpty
+                || !lifecycleEventTimes.isEmpty else {
+            return nil
+        }
         return DetachedAgentRuntimeState(
             panelId: panelId,
             statusEntries: statusEntriesForPanel,
             agentPIDs: agentPIDsForPanel,
             agentPIDProcessIdentities: agentPIDIdentitiesForPanel,
             agentPIDKeys: pidKeys,
+            agentLifecycleStates: lifecycleStates,
             agentLifecycleEventTimes: lifecycleEventTimes
         )
     }
@@ -268,17 +275,14 @@ extension Workspace {
         return currentIdentity == recordedIdentity
     }
 
+    /// Reads the identity the port scanner and session restore compare against.
+    ///
+    /// Delegates rather than reading the process table itself: a second reader
+    /// with different privilege behavior would record `nil` identities for
+    /// agents running under another euid, which `PortScanner.validateAgentRoots`
+    /// treats as permanently incomplete evidence.
     static func agentPIDProcessIdentity(pid: pid_t) -> AgentPIDProcessIdentity? {
-        guard pid > 0 else { return nil }
-        var info = proc_bsdinfo()
-        let expectedSize = MemoryLayout<proc_bsdinfo>.stride
-        let size = proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &info, Int32(expectedSize))
-        guard size == expectedSize else { return nil }
-        return AgentPIDProcessIdentity(
-            pid: pid,
-            startSeconds: Int64(info.pbi_start_tvsec),
-            startMicroseconds: Int64(info.pbi_start_tvusec)
-        )
+        AgentPIDProcessIdentity(pid: pid)
     }
 
     func suppressesRawTerminalNotification(panelId: UUID?) -> Bool {
@@ -384,6 +388,9 @@ extension Workspace {
         for key in runtimeState.agentPIDKeys where runtimeState.agentPIDs[key] == nil {
             recordAgentPIDOwnership(key: key, panelId: runtimeState.panelId)
         }
+        for (key, lifecycle) in runtimeState.agentLifecycleStates {
+            setAgentLifecycle(key: key, panelId: runtimeState.panelId, lifecycle: lifecycle)
+        }
         if didAdoptAgentPID {
             refreshTrackedAgentPorts()
         }
@@ -402,8 +409,11 @@ extension Workspace {
         publishSurfaceClosedEvent: Bool,
         clearSurfaceNotifications: Bool,
         requestTransferredRemoteCleanup: Bool,
-        cleanupControllerSurfaceState: Bool = false
+        discardAgentHibernationTracking: Bool = true,
+        cleanupControllerSurfaceState: Bool = false,
+        preservesTerminalForTransfer: Bool = false
     ) -> WorkspaceRemoteConfiguration? {
+        appLinkHandoffCoordinator.cancel(sourcePanelID: panelId)
         if publishSurfaceClosedEvent {
             publishCmuxSurfaceClosed(panelId, paneId: paneId, panel: panel, origin: origin)
         }
@@ -442,8 +452,27 @@ extension Workspace {
             )
         }
 
-        panels.removeValue(forKey: panelId)
+        let removedPanel = panels.removeValue(forKey: panelId)
+        if discardAgentHibernationTracking {
+            AgentHibernationController.shared.discardTrackingStateForClosedPanel(
+                workspaceId: id,
+                panelId: panelId
+            )
+        }
+        if let terminalPanel =
+                (removedPanel ?? panel) as? TerminalPanel {
+            terminalFontSizeChangeCoordinator?
+                .terminalDidLeaveWorkspace(
+                    terminalPanel,
+                    workspace: self,
+                    preservingTransfer:
+                        preservesTerminalForTransfer
+                )
+        }
         untrackRemoteTerminalSurface(panelId)
+        if closePanel {
+            endedRemoteTerminalLifecycleIDsBySurfaceId.removeValue(forKey: panelId)
+        }
         discardRemoteDirectoryTrustState(panelId: panelId)
         pendingRemoteTerminalChildExitSurfaceIds.remove(panelId)
         removeSurfaceMappings(forPanelId: panelId)
@@ -460,6 +489,7 @@ extension Workspace {
         manualUnreadPanelIds.remove(panelId)
         manualUnreadMarkedAt.removeValue(forKey: panelId)
         panelShellActivityStates.removeValue(forKey: panelId)
+        restoredPanelTitleBoundariesByPanelId.removeValue(forKey: panelId)
         clearAgentLifecycleStates(panelId: panelId)
         surfaceTTYNames.removeValue(forKey: panelId)
         discardRemotePTYSessionID(panelId: panelId)

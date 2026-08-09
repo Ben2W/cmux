@@ -960,16 +960,13 @@ extension CLINotifyProcessIntegrationRegressionTests {
             "Antigravity hooks must still dispatch when agy does not preserve CMUX_SURFACE_ID, saw \(allCommands)"
         )
 
-        let preToolUse = try XCTUnwrap(cmuxGroup["PreToolUse"] as? [[String: Any]])
-        let preToolCommands = preToolUse
-            .compactMap { $0["hooks"] as? [[String: Any]] }
-            .flatMap { $0 }
-        XCTAssertTrue(
-            preToolCommands.contains {
-                ($0["command"] as? String)?.contains("hooks feed --source antigravity --event PreToolUse") == true
-                    && ($0["timeout"] as? Int) == 120
-            },
-            "Expected Antigravity PreToolUse feed hook with second-based timeout, saw \(preToolCommands)"
+        XCTAssertNil(
+            cmuxGroup["PreToolUse"],
+            "Antigravity rejects PreToolUse hook output, so cmux must not install a tool-gating hook"
+        )
+        XCTAssertNil(
+            cmuxGroup["PostToolUse"],
+            "Antigravity tool lifecycle hooks must not be installed when they cannot safely fail neutral"
         )
 
         let stop = try XCTUnwrap(cmuxGroup["Stop"] as? [[String: Any]])
@@ -984,7 +981,6 @@ extension CLINotifyProcessIntegrationRegressionTests {
         XCTAssertNotNil(cmuxGroup["SessionEnd"])
         XCTAssertNotNil(cmuxGroup["turn-completion"])
         XCTAssertNotNil(cmuxGroup["Notification"])
-        XCTAssertNotNil(cmuxGroup["PostToolUse"])
     }
 
     func testKiroHookInstallUsesAgentConfigShapeAndPreservesDenyExit() throws {
@@ -3329,15 +3325,32 @@ extension CLINotifyProcessIntegrationRegressionTests {
         try JSONSerialization.data(withJSONObject: legacyHookJSON, options: [.prettyPrinted, .sortedKeys])
             .write(to: codexHome.appendingPathComponent("hooks.json", isDirectory: false), options: .atomic)
 
+        let inheritedEnvironment = [
+            "HOME": root.path,
+            "CFFIXED_USER_HOME": root
+                .appendingPathComponent("inherited-app-host", isDirectory: true).path,
+            "XDG_CONFIG_HOME": root
+                .appendingPathComponent("inherited-app-host/.config", isDirectory: true).path,
+            "CMUX_APP_HOST_ISOLATION_REQUIRED": "1",
+            "CODEX_HOME": codexHome.path,
+            "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+            "CMUX_CLI_SENTRY_DISABLED": "1",
+        ]
+        let environmentResult = runProcess(
+            executablePath: "/usr/bin/env",
+            arguments: [],
+            environment: inheritedEnvironment,
+            timeout: 5
+        )
+        XCTAssertEqual(environmentResult.status, 0, environmentResult.stderr)
+        let childEnvironment = Set(environmentResult.stdout.split(separator: "\n").map(String.init))
+        XCTAssertTrue(childEnvironment.contains("CFFIXED_USER_HOME=\(root.path)"))
+        XCTAssertTrue(childEnvironment.contains("XDG_CONFIG_HOME=\(root.path)/.config"))
+
         let result = runProcess(
             executablePath: cliPath,
             arguments: ["hooks", "codex", "install", "--yes"],
-            environment: [
-                "HOME": root.path,
-                "CODEX_HOME": codexHome.path,
-                "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
-                "CMUX_CLI_SENTRY_DISABLED": "1",
-            ],
+            environment: inheritedEnvironment,
             timeout: 5
         )
 

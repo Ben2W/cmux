@@ -65,14 +65,10 @@ struct DisconnectedWorkspaceShellView: View {
                 .accessibilityIdentifier("MobileDisconnectedWorkspaceShell")
                 .task {
                     // Load (and, via the backup decorator, restore) saved Macs so a
-                    // known/restored Mac shows up here for one-tap reconnect. Only
-                    // auto-present the pairing sheet when there is nothing to pick,
-                    // so a returning user is not buried under the add-device flow.
+                    // known/restored Mac shows up here for one-tap reconnect.
+                    // Same-account discovery is the primary path; manual pairing
+                    // remains available from the explicit Add Computer controls.
                     await store?.loadPairedMacs()
-                    if shouldAutoPresentAddDeviceAfterLoadingSavedMacs {
-                        showAddDevice()
-                        return
-                    }
                     #if os(iOS)
                     // Registry + presence enrich the rows (online dots, build
                     // labels). The loop then keeps presence and last-seen fresh
@@ -102,12 +98,11 @@ struct DisconnectedWorkspaceShellView: View {
         }) {
             // Reuse the same Settings sheet the workspace list opens from its
             // Settings button so the no-devices screen's chrome matches. There is no
-            // connected host or QR to rescan here, but the store is forwarded so
+            // connected computer to forget here, but the store is forwarded so
             // a user whose active Mac went offline can still switch to another
             // paired Mac; the sheet also surfaces the account + Sign Out.
             MobileSettingsView(
                 connectedHostName: "",
-                rescanQR: nil,
                 startPairingScanner: {
                     settingsPairingScannerHandoff.requestScannerAfterDismiss(
                         isSettingsPresented: $showingSettings
@@ -138,15 +133,9 @@ struct DisconnectedWorkspaceShellView: View {
         store.map { MacComputerSnapshot.snapshots(from: $0) } ?? []
     }
 
-    var shouldAutoPresentAddDeviceAfterLoadingSavedMacs: Bool {
-        guard let store else { return false }
-        return store.pairedMacLoadState == .loaded
-            && store.pairedMacs.isEmpty
-    }
-
     @ViewBuilder
     private var content: some View {
-        if !savedComputers.isEmpty {
+        if !savedComputers.isEmpty || !(store?.hiddenComputers.isEmpty ?? true) {
             savedComputersList(savedComputers)
         } else {
             emptyState
@@ -154,28 +143,29 @@ struct DisconnectedWorkspaceShellView: View {
     }
 
     /// The returning-user state: a real list of the saved computers, one row per
-    /// logical Mac, with presence, last-seen, tap-to-reconnect, and
-    /// swipe-to-hide — the same row component as the Computers screen.
+    /// logical Mac, with presence, last-seen, tap-to-reconnect, and an inline
+    /// visibility switch. Hidden Macs stay in the same section with switches off.
     /// Snapshot boundary (see AGENTS.md): rows receive immutable
     /// ``MacComputerSnapshot`` values and closures only, never the store.
     private func savedComputersList(_ computers: [MacComputerSnapshot]) -> some View {
         List {
             Section {
-                ForEach(computers) { computer in
-                    MacComputerRow(
-                        computer: computer,
-                        hide: { _ in hideComputer(computer) },
-                        style: .reconnect,
-                        connect: { _ in connect(to: computer) },
-                        isConnecting: connectingMacID == computer.id
-                    )
-                }
+                ComputerVisibilityRows(
+                    visibleComputers: computers,
+                    hiddenComputers: store?.hiddenComputers ?? [],
+                    style: .reconnect,
+                    connect: connect,
+                    connectingComputerID: connectingMacID,
+                    mutatingComputerIDs: store?.computerVisibilityMutationIDs ?? [],
+                    hide: hideComputer,
+                    unhide: unhideComputer
+                )
             } header: {
                 Text(L10n.string("mobile.devices.savedTitle", defaultValue: "Your Computers"))
             } footer: {
                 Text(L10n.string(
                     "mobile.disconnected.listFooter",
-                    defaultValue: "Tap a computer to reconnect. Swipe left to hide one."
+                    defaultValue: "Tap a shown computer to reconnect. Use its switch to show or hide it on this iPhone."
                 ))
             }
             Section {
@@ -212,13 +202,13 @@ struct DisconnectedWorkspaceShellView: View {
     private var emptyState: some View {
         ContentUnavailableView {
             Label(
-                L10n.string("mobile.devices.emptyTitle", defaultValue: "No devices"),
+                L10n.string("mobile.devices.emptyTitle", defaultValue: "No Computers"),
                 systemImage: "desktopcomputer.and.iphone"
             )
         } description: {
             Text(L10n.string(
                 "mobile.devices.emptyDescription",
-                defaultValue: "Add a computer to start syncing terminal workspaces."
+                defaultValue: "Sign in to cmux on your computer with this account and it appears here automatically."
             ))
         } actions: {
             Button(action: showAddDevice) {
@@ -287,9 +277,17 @@ struct DisconnectedWorkspaceShellView: View {
     }
 
     private func hideComputer(_ computer: MacComputerSnapshot) {
-        Task {
-            await store?.hideMac(macDeviceID: computer.deviceId)
-        }
+        store?.requestHideStoredPairedMacEntries(
+            representativeID: computer.id,
+            aliasIDs: computer.aliasIDs
+        )
+    }
+
+    private func unhideComputer(_ computer: MobileHiddenComputer) {
+        store?.requestUnhideMacDeviceID(
+            computer.macDeviceID,
+            instanceTag: computer.instanceTag
+        )
     }
     #else
     /// Saved Macs restored/known on this device (macOS fallback shell).
@@ -299,14 +297,17 @@ struct DisconnectedWorkspaceShellView: View {
         ContentUnavailableView {
             Label(
                 savedMacs.isEmpty
-                    ? L10n.string("mobile.devices.emptyTitle", defaultValue: "No devices")
+                    ? L10n.string("mobile.devices.emptyTitle", defaultValue: "No Computers")
                     : L10n.string("mobile.devices.savedTitle", defaultValue: "Your Computers"),
                 systemImage: "desktopcomputer.and.iphone"
             )
         } description: {
             Text(
                 savedMacs.isEmpty
-                    ? L10n.string("mobile.devices.emptyDescription", defaultValue: "Add a computer to start syncing terminal workspaces.")
+                    ? L10n.string(
+                        "mobile.devices.emptyDescription",
+                        defaultValue: "Sign in to cmux on your computer with this account and it appears here automatically."
+                    )
                     : L10n.string("mobile.devices.savedDescription", defaultValue: "Tap a saved computer to reconnect, or add another.")
             )
         } actions: {
@@ -314,13 +315,18 @@ struct DisconnectedWorkspaceShellView: View {
                 VStack(spacing: 8) {
                     ForEach(savedMacs) { mac in
                         Button {
-                            Task { await store.switchToMac(macDeviceID: mac.macDeviceID) }
+                            Task {
+                                await store.switchToMac(
+                                    macDeviceID: mac.macDeviceID,
+                                    instanceTag: mac.instanceTag
+                                )
+                            }
                         } label: {
                             Label(mac.displayName ?? mac.macDeviceID, systemImage: "desktopcomputer")
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         .buttonStyle(.bordered)
-                        .accessibilityIdentifier("MobileDisconnectedSavedMac-\(mac.macDeviceID)")
+                        .accessibilityIdentifier("MobileDisconnectedSavedMac-\(mac.id)")
                     }
                 }
                 .frame(maxWidth: 320)

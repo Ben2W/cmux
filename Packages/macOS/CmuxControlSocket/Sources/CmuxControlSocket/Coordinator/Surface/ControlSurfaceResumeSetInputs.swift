@@ -24,6 +24,10 @@ public struct ControlSurfaceResumeSetInputs: Sendable, Equatable {
     public let environment: [String: String]?
     /// The trusted hook event time used to order binding mutations, if any.
     public let agentEventTime: TimeInterval?
+    /// Structured launch data supplied alongside the compatibility command.
+    public let launchCommand: ControlAgentLaunchCommand?
+    /// Last provider permission mode captured by an agent hook.
+    public let permissionMode: String?
     /// Whether automatic resume is requested (already gated: `true` only for the
     /// `agent-hook` source with `auto_resume == true`).
     public let autoResume: Bool
@@ -55,6 +59,8 @@ public struct ControlSurfaceResumeSetInputs: Sendable, Equatable {
         source: String?,
         environment: [String: String]?,
         agentEventTime: TimeInterval?,
+        launchCommand: ControlAgentLaunchCommand?,
+        permissionMode: String?,
         autoResume: Bool,
         remoteWorkspaceID: UUID?,
         remoteRelayParameters: [String: JSONValue]?
@@ -67,6 +73,8 @@ public struct ControlSurfaceResumeSetInputs: Sendable, Equatable {
         self.source = source
         self.environment = environment
         self.agentEventTime = agentEventTime
+        self.launchCommand = launchCommand
+        self.permissionMode = permissionMode
         self.autoResume = autoResume
         self.remoteWorkspaceID = remoteWorkspaceID
         self.remoteRelayParameters = remoteRelayParameters

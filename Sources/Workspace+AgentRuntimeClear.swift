@@ -1,5 +1,56 @@
 import Foundation
 
+struct AgentRuntimeMutationOrderingDecision {
+    let isAccepted: Bool
+    let retainedEventTime: TimeInterval?
+}
+
+enum AgentRuntimeMutationOrdering {
+    static func decision(
+        statusKey: String,
+        lifecycleEventTime: TimeInterval?,
+        statusEventTime: TimeInterval?,
+        replacementWatermark: TimeInterval?,
+        hasLifecycleState: Bool,
+        agentEventTime: TimeInterval?,
+        enforceOrdering: Bool,
+        isLifecycleMutation: Bool
+    ) -> AgentRuntimeMutationOrderingDecision {
+        guard enforceOrdering else {
+            return AgentRuntimeMutationOrderingDecision(
+                isAccepted: true,
+                retainedEventTime: nil
+            )
+        }
+        if let replacementWatermark {
+            guard let agentEventTime, agentEventTime > replacementWatermark else {
+                return AgentRuntimeMutationOrderingDecision(
+                    isAccepted: false,
+                    retainedEventTime: nil
+                )
+            }
+        }
+        if let orderingWatermark = [lifecycleEventTime, statusEventTime]
+            .compactMap({ $0 })
+            .max() {
+            guard let agentEventTime, agentEventTime >= orderingWatermark else {
+                return AgentRuntimeMutationOrderingDecision(
+                    isAccepted: false,
+                    retainedEventTime: nil
+                )
+            }
+        }
+        let retainsDurableLifecycleWatermark =
+            AgentHibernationLifecycleStatusKeys.allowedStatusKeys.contains(statusKey)
+            || isLifecycleMutation
+            || hasLifecycleState
+        return AgentRuntimeMutationOrderingDecision(
+            isAccepted: true,
+            retainedEventTime: retainsDurableLifecycleWatermark ? agentEventTime : nil
+        )
+    }
+}
+
 /// Ordered teardown for agent runtime state shared by socket and internal cleanup paths.
 extension Workspace {
     @discardableResult
@@ -7,11 +58,15 @@ extension Workspace {
         key: String,
         panelId: UUID? = nil,
         clearStatus: Bool = false,
+        requireOwnedKey: Bool = false,
         agentEventTime: TimeInterval? = nil,
         enforceAgentEventOrdering: Bool = false,
         refreshPorts: Bool = true
     ) -> Bool {
         let ownedPanelId = agentPIDPanelIdsByKey[key]
+        if requireOwnedKey, ownedPanelId == nil {
+            return false
+        }
         if let panelId, let ownedPanelId, ownedPanelId != panelId {
             return false
         }
@@ -76,33 +131,30 @@ extension Workspace {
                 ? entry.agentEventTime
                 : nil
         }
-        if AgentHibernationLifecycleStatusKeys.allowedStatusKeys.contains(statusKey),
-           let replacementWatermark = structuredAgentReplacementWatermark(
-               panelId: panelId,
-               excludingStatusKey: statusKey
-           ) {
-            guard let agentEventTime, agentEventTime > replacementWatermark else {
-                return false
-            }
-        }
-        if let orderingWatermark = [lifecycleEventTime, statusEventTime]
-            .compactMap({ $0 })
-            .max() {
-            guard let agentEventTime, agentEventTime >= orderingWatermark else {
-                return false
-            }
-        }
-        let retainsDurableLifecycleWatermark =
-            AgentHibernationLifecycleStatusKeys.allowedStatusKeys.contains(statusKey) ||
-            isLifecycleMutation ||
-            agentLifecycleStatesByPanelId[panelId]?[statusKey] != nil
-        if let agentEventTime, retainsDurableLifecycleWatermark {
+        let replacementWatermark = AgentHibernationLifecycleStatusKeys.allowedStatusKeys.contains(statusKey)
+            ? structuredAgentReplacementWatermark(
+                panelId: panelId,
+                excludingStatusKey: statusKey
+            )
+            : nil
+        let decision = AgentRuntimeMutationOrdering.decision(
+            statusKey: statusKey,
+            lifecycleEventTime: lifecycleEventTime,
+            statusEventTime: statusEventTime,
+            replacementWatermark: replacementWatermark,
+            hasLifecycleState: agentLifecycleStatesByPanelId[panelId]?[statusKey] != nil,
+            agentEventTime: agentEventTime,
+            enforceOrdering: true,
+            isLifecycleMutation: isLifecycleMutation
+        )
+        guard decision.isAccepted else { return false }
+        if let retainedEventTime = decision.retainedEventTime {
             if let current = agentLifecycleEventTimesByPanelId[panelId]?[statusKey] {
-                if agentEventTime > current {
-                    agentLifecycleEventTimesByPanelId[panelId, default: [:]][statusKey] = agentEventTime
+                if retainedEventTime > current {
+                    agentLifecycleEventTimesByPanelId[panelId, default: [:]][statusKey] = retainedEventTime
                 }
             } else {
-                agentLifecycleEventTimesByPanelId[panelId, default: [:]][statusKey] = agentEventTime
+                agentLifecycleEventTimesByPanelId[panelId, default: [:]][statusKey] = retainedEventTime
             }
         }
         return true

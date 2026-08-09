@@ -12,16 +12,27 @@ extension CLINotifyProcessIntegrationRegressionTests {
     final class MockSocketServerState: @unchecked Sendable {
         private let lock = NSLock()
         private(set) var commands: [String] = []
+        private var commandTimestamps: [TimeInterval] = []
 
         func append(_ command: String) {
             lock.lock()
             commands.append(command)
+            commandTimestamps.append(ProcessInfo.processInfo.systemUptime)
             lock.unlock()
         }
 
         func snapshot() -> [String] {
             lock.lock()
             let value = commands
+            lock.unlock()
+            return value
+        }
+
+        func timestampedSnapshot() -> [(command: String, timestamp: TimeInterval)] {
+            lock.lock()
+            let value = zip(commands, commandTimestamps).map {
+                (command: $0.0, timestamp: $0.1)
+            }
             lock.unlock()
             return value
         }
@@ -374,7 +385,7 @@ extension CLINotifyProcessIntegrationRegressionTests {
         defer { capture.cleanup() }
         process.executableURL = URL(fileURLWithPath: executablePath)
         process.arguments = arguments
-        process.environment = environment
+        process.environment = isolatedCLIChildEnvironment(environment)
         capture.attach(to: process)
 
         let exitSignal = DispatchSemaphore(value: 0)
@@ -407,5 +418,27 @@ extension CLINotifyProcessIntegrationRegressionTests {
             stderr: capture.standardError(),
             timedOut: timedOut
         )
+    }
+
+    /// App-host CI gives XCTest an isolated Core Foundation home. CLI tests
+    /// then supply a narrower HOME for each subprocess. Keep all three user
+    /// configuration roots on that per-test home so the inherited app-host
+    /// redirects cannot make sibling CLI tests share state.
+    private func isolatedCLIChildEnvironment(
+        _ environment: [String: String]
+    ) -> [String: String] {
+        guard environment["CMUX_APP_HOST_ISOLATION_REQUIRED"] == "1",
+              let rawHome = environment["HOME"]?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !rawHome.isEmpty else {
+            return environment
+        }
+
+        var resolved = environment
+        resolved["CFFIXED_USER_HOME"] = rawHome
+        resolved["XDG_CONFIG_HOME"] = URL(
+            fileURLWithPath: rawHome,
+            isDirectory: true
+        ).appendingPathComponent(".config", isDirectory: true).path
+        return resolved
     }
 }

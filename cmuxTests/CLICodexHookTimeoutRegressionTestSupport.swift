@@ -22,6 +22,7 @@ struct CodexHookProcessRunResult {
 func codexHookTestEnvironment(root: URL, codexHome: URL) -> [String: String] {
     [
         "HOME": root.path,
+        "CFFIXED_USER_HOME": root.path,
         "CODEX_HOME": codexHome.path,
         "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
         "CMUX_CLI_SENTRY_DISABLED": "1",
@@ -269,7 +270,7 @@ func waitForFile(_ url: URL, containing expected: String, timeout: TimeInterval)
 }
 
 func waitForFileLineCount(_ url: URL, count expectedCount: Int, timeout: TimeInterval) -> Bool {
-    waitForCondition(timeout: timeout) {
+    waitForConditionBlocking(timeout: timeout) {
         guard let content = try? String(contentsOf: url, encoding: .utf8) else {
             return false
         }
@@ -278,6 +279,25 @@ func waitForFileLineCount(_ url: URL, count expectedCount: Int, timeout: TimeInt
 }
 
 func waitForCondition(timeout: TimeInterval, pollInterval: TimeInterval = 0.02, _ condition: () -> Bool) -> Bool {
+    waitForConditionBlocking(
+        timeout: timeout,
+        pollInterval: pollInterval,
+        condition
+    )
+}
+
+/// Polls `condition` while blocking the calling thread with `Thread.sleep`.
+///
+/// Use it only for conditions a background thread satisfies, such as a socket
+/// accumulator or a file a child process writes. It runs no run loop, so on the
+/// main thread it starves main-queue and main-actor work and the condition can
+/// never become true. Main-thread waits belong in the per-file XCTWaiter
+/// helpers, which pump the main queue between polls.
+func waitForConditionBlocking(
+    timeout: TimeInterval,
+    pollInterval: TimeInterval = 0.02,
+    _ condition: () -> Bool
+) -> Bool {
     let deadline = Date().addingTimeInterval(timeout)
     while Date() < deadline {
         if condition() {

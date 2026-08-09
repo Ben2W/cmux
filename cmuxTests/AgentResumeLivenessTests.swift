@@ -29,8 +29,13 @@ struct AgentResumeLivenessTests {
             // one value that would contradict the empty-PID case.
             processLiveness: processIDs.isEmpty ? .exited : .running,
             processIDs: processIDs,
+            processIdentities: [:],
             agentProcessIDs: processIDs,
-            agentProcessIdentities: [:]
+            agentProcessIdentities: [:],
+            hibernationPanelProcessIDs: processIDs,
+            terminationProcessIDs: processIDs,
+            terminationProcessIdentities: [:],
+            containsUnrelatedProcess: false
         )
     }
 

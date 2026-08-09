@@ -54,6 +54,12 @@ public protocol ControlSurfaceContext: AnyObject {
     /// - Returns: The respawn strings.
     func controlSurfaceRespawnStrings() -> ControlSurfaceRespawnStrings
 
+    /// Returns the app-localized generic surface-not-found message for close
+    /// failures whose explicit `surface_id` cannot be parsed or resolved.
+    ///
+    /// - Returns: The localized surface-not-found message.
+    func controlSurfaceNotFoundMessage() -> String
+
     // MARK: - focus / split / respawn / create / close
 
     /// Focuses a surface for `surface.focus`.
@@ -108,10 +114,13 @@ public protocol ControlSurfaceContext: AnyObject {
     /// - Parameters:
     ///   - routing: The routing selectors.
     ///   - surfaceID: The explicit `surface_id`, or `nil` for the focused surface.
+    ///   - hasSurfaceIDParam: Whether a `surface_id` param was present at all, so
+    ///     an unresolvable explicit ref cannot fall back to the focused surface.
     /// - Returns: The close resolution.
     func controlSurfaceClose(
         routing: ControlRoutingSelectors,
-        surfaceID: UUID?
+        surfaceID: UUID?,
+        hasSurfaceIDParam: Bool
     ) -> ControlSurfaceCloseResolution
 
     // MARK: - move / reorder
@@ -235,6 +244,12 @@ public protocol ControlSurfaceContext: AnyObject {
     /// - Returns: The invalid agent-event-time error message.
     nonisolated func controlSurfaceInvalidAgentEventTimeError() -> String
 
+    /// The app-bundle-resolved localized validation strings for
+    /// `surface.resume.*` commands.
+    ///
+    /// - Returns: The surface-resume strings.
+    func controlSurfaceResumeStrings() -> ControlSurfaceResumeStrings
+
     /// Sets a resume binding for `surface.resume.set`. The app resolves the
     /// target, runs the (possibly blocking, app-bundle-localized) approval flow,
     /// and stores the binding.
@@ -269,6 +284,8 @@ public protocol ControlSurfaceContext: AnyObject {
     ///   - expectedCheckpointID: The optional expected checkpoint guard.
     ///   - expectedSource: The optional expected source guard.
     ///   - agentEventTime: The trusted hook event time used for mutation ordering.
+    ///   - agentSessionEnded: Whether a managed hook is clearing the binding as
+    ///     part of authoritative session teardown.
     /// - Returns: The resume resolution.
     func controlSurfaceResumeClear(
         routing: ControlRoutingSelectors,
@@ -276,7 +293,8 @@ public protocol ControlSurfaceContext: AnyObject {
         hasResolvedWindowID: Bool,
         expectedCheckpointID: String?,
         expectedSource: String?,
-        agentEventTime: TimeInterval?
+        agentEventTime: TimeInterval?,
+        agentSessionEnded: Bool
     ) -> ControlSurfaceResumeResolution
 
     // MARK: - report_tty / report_pwd / report_shell_state / ports_kick
@@ -287,11 +305,17 @@ public protocol ControlSurfaceContext: AnyObject {
     ///   - workspaceID: The target workspace.
     ///   - requestedSurfaceID: The explicit `surface_id`, or `nil` to resolve.
     ///   - ttyName: The reported (trimmed, non-empty) TTY name.
+    ///   - authenticatedRemoteWorkspaceID: Relay-authenticated origin, when remote.
+    ///   - terminalLifecycleID: Runtime lifecycle carried by a remote report.
+    ///   - attemptID: Attach attempt carried by a remote report.
     /// - Returns: The report resolution.
     func controlSurfaceReportTTY(
         workspaceID: UUID,
         requestedSurfaceID: UUID?,
-        ttyName: String
+        ttyName: String,
+        authenticatedRemoteWorkspaceID: UUID?,
+        terminalLifecycleID: UUID?,
+        attemptID: UUID?
     ) -> ControlSurfaceReportTTYResolution
 
     /// Records a reported current working directory for `surface.report_pwd`.

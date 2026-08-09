@@ -64,7 +64,11 @@ public protocol ControlSidebarContext: AnyObject {
     )
 
     /// Enqueues the `clear_status`/`clear_meta` removal mutation.
-    nonisolated func controlSidebarScheduleStatusClear(target: ControlSidebarTabTarget, key: String)
+    nonisolated func controlSidebarScheduleStatusClear(
+        target: ControlSidebarTabTarget,
+        key: String,
+        panelID: UUID?
+    )
 
     /// Enqueues the `set_agent_pid` record mutation.
     nonisolated func controlSidebarScheduleAgentPIDRecord(
@@ -121,7 +125,8 @@ public protocol ControlSidebarContext: AnyObject {
         key: String,
         panelID: UUID?,
         clearStatus: Bool,
-        agentEventTime: TimeInterval?
+        agentEventTime: TimeInterval?,
+        requireOwnedKey: Bool
     )
 
     /// Enqueues the `report_meta_block` upsert mutation.
@@ -317,8 +322,11 @@ public protocol ControlSidebarContext: AnyObject {
 
     // MARK: Misc ops
 
-    /// Reloads the Ghostty configuration (`reload_config`).
-    func controlSidebarReloadConfig()
+    /// Reloads the Ghostty configuration (`reload_config`) and invokes the
+    /// completion after the replacement configuration commits.
+    func controlSidebarReloadConfig(
+        completion: @escaping @MainActor () -> Void
+    )
 
     /// Force-refreshes the selected workspace's terminal panels
     /// (`refresh_surfaces`); returns the refreshed count.
