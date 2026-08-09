@@ -1,4 +1,5 @@
 import CmuxSettings
+import CmuxNotifications
 import Foundation
 
 /// Applies agent notification policy and publishes accepted events through the shared mutation bus.
@@ -48,6 +49,7 @@ struct AgentNotificationDelivery: Sendable {
             body: body,
             agentStatusKey: agentStatusKey,
             agentEventTime: agentEventTime,
+            replyShape: TerminalNotificationReplyShape.forAgentCategory(wire: category?.rawValue),
             coalesces: coalesces
         )
         return true

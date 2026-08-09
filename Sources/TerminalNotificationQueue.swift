@@ -1,5 +1,6 @@
 import CmuxControlSocket
 import CmuxRemoteSession
+import CmuxNotifications
 import Foundation
 
 fileprivate struct QueuedTerminalNotificationKey: Hashable, Sendable {
@@ -14,6 +15,7 @@ fileprivate struct QueuedTerminalNotification: Sendable {
     let body: String
     let agentStatusKey: String?
     let agentEventTime: TimeInterval?
+    let replyShape: TerminalNotificationReplyShape
 }
 
 fileprivate enum TerminalSocketMutation {
@@ -83,6 +85,7 @@ final class TerminalMutationBus: @unchecked Sendable {
         body: String,
         agentStatusKey: String? = nil,
         agentEventTime: TimeInterval? = nil,
+        replyShape: TerminalNotificationReplyShape = .none,
         coalesces: Bool = true
     ) {
         enqueueNotification(QueuedTerminalNotification(
@@ -91,7 +94,8 @@ final class TerminalMutationBus: @unchecked Sendable {
             subtitle: subtitle,
             body: body,
             agentStatusKey: agentStatusKey,
-            agentEventTime: agentEventTime
+            agentEventTime: agentEventTime,
+            replyShape: replyShape
         ), coalesces: coalesces)
     }
 
@@ -512,6 +516,7 @@ final class TerminalMutationBus: @unchecked Sendable {
                     body: notification.body,
                     agentStatusKey: notification.agentStatusKey,
                     agentEventTime: notification.agentEventTime,
+                    replyShape: notification.replyShape,
                     notificationGeneration: entry.notificationGeneration ?? 0
                 )
             case .clearAllNotifications(let boundary):
