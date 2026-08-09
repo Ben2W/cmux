@@ -685,6 +685,42 @@ struct AgentHibernationTests {
 
     @MainActor
     @Test
+    func testLiveIdleReconciliationRejectsMissingObservationEventTime() throws {
+        let workspace = Workspace()
+        let panelId = try #require(workspace.focusedPanelId)
+        workspace.setAgentLifecycle(key: "codex", panelId: panelId, lifecycle: .running)
+        workspace.statusEntries["codex"] = SidebarStatusEntry(
+            key: "codex",
+            value: "Running",
+            icon: "bolt.fill",
+            color: "#4C8DFF",
+            agentOwnerPanelID: panelId
+        )
+        let observation = RestorableAgentSessionIndex.Entry(
+            snapshot: SessionRestorableAgentSnapshot(
+                kind: .codex,
+                sessionId: "idle-without-event-time",
+                workingDirectory: "/tmp/repo",
+                launchCommand: nil
+            ),
+            lifecycle: .idle,
+            runtimeStatusEventTime: nil,
+            updatedAt: 0,
+            processLiveness: .unknown,
+            processIDs: [],
+            agentProcessIDs: [],
+            agentProcessIdentities: [:]
+        )
+
+        workspace.reconcileLiveIdleAgentStatus(panelId: panelId, observation: observation)
+
+        expectEqual(workspace.agentHibernationLifecycleState(panelId: panelId, fallback: nil), .running)
+        expectEqual(workspace.statusEntries["codex"]?.value, "Running")
+        expectNil(workspace.agentLifecycleEventTimesByPanelId[panelId]?["codex"])
+    }
+
+    @MainActor
+    @Test
     func testLiveIdleHookObservationDoesNotOverwriteNewerRunningEvent() throws {
         let home = FileManager.default.temporaryDirectory
             .appendingPathComponent("cmux-agent-hibernation-stale-idle-reconcile-\(UUID().uuidString)", isDirectory: true)
