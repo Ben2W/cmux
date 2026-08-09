@@ -1,3 +1,4 @@
+import CmuxControlSocket
 import Foundation
 
 /// Live-retargeting delivery and clear semantics for agent notifications
@@ -89,9 +90,10 @@ extension TerminalNotificationStore {
         }
         if let agentStatusKey, let agentEventTime {
             guard let liveSurfaceId = target.surfaceId else { return }
-            let manager = AppDelegate.shared?.tabManagerFor(tabId: target.tabId) ?? AppDelegate.shared?.tabManager
-            guard let workspace = manager?.workspacesById[target.tabId],
-                  workspace.acceptAgentRuntimeMutation(
+            guard let owner = TerminalController.shared.controlSidebarResolvePanelOwner(
+                target: .workspace(target.tabId),
+                panelID: liveSurfaceId
+            ), owner.acceptAgentRuntimeMutation(
                       statusKey: agentStatusKey,
                       panelId: liveSurfaceId,
                       agentEventTime: agentEventTime,

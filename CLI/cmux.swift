@@ -1617,7 +1617,7 @@ final class ClaudeHookSessionStore {
         ].compactMap({ $0 }).max() else { return }
         state.sessionTombstones[removed.sessionId] = ClaudeHookSessionTombstone(
             eventTime: eventTime,
-            updatedAt: Date().timeIntervalSince1970
+            updatedAt: Date.now.timeIntervalSince1970
         )
     }
 

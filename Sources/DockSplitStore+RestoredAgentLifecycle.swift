@@ -243,7 +243,7 @@ extension DockSplitStore {
                     url: url,
                     priority: priority,
                     format: format,
-                    timestamp: Date(),
+                    timestamp: .now,
                     agentEventTime: agentEventTime,
                     agentOwnerPanelID: panelId
                 )
@@ -443,6 +443,27 @@ extension DockSplitStore {
         return String(key[..<dotIndex])
     }
 
+    @discardableResult
+    func acceptAgentRuntimeMutation(
+        statusKey: String,
+        panelId: UUID,
+        agentEventTime: TimeInterval?,
+        enforceOrdering: Bool,
+        isLifecycleMutation: Bool = false
+    ) -> Bool {
+        var isAccepted = false
+        mutateAgentRuntime(panelId: panelId) { runtime in
+            isAccepted = Self.acceptAgentRuntimeMutation(
+                statusKey: statusKey,
+                agentEventTime: agentEventTime,
+                enforceOrdering: enforceOrdering,
+                isLifecycleMutation: isLifecycleMutation,
+                runtime: &runtime
+            )
+        }
+        return isAccepted
+    }
+
     private static func acceptAgentRuntimeMutation(
         statusKey: String,
         agentEventTime: TimeInterval?,
@@ -480,7 +501,7 @@ extension DockSplitStore {
         )
         guard decision.isAccepted else { return false }
         if let retainedEventTime = decision.retainedEventTime,
-           retainedEventTime > (runtime.agentLifecycleEventTimes[statusKey] ?? -.infinity) {
+           retainedEventTime > (runtime.agentLifecycleEventTimes[statusKey] ?? -Double.infinity) {
             runtime.agentLifecycleEventTimes[statusKey] = retainedEventTime
         }
         return true

@@ -51,7 +51,7 @@ extension Workspace {
             return
         }
         guard observation.lifecycle == .idle,
-              Date().timeIntervalSince1970 - eventTime >= Self.agentRunningStatusReconciliationDelay,
+              Date.now.timeIntervalSince1970 - eventTime >= Self.agentRunningStatusReconciliationDelay,
               let statusKey,
               agentLifecycleStatesByPanelId[panelId]?[statusKey] == .running else {
             return
@@ -126,7 +126,7 @@ extension Workspace {
                 url: url,
                 priority: priority,
                 format: format,
-                timestamp: Date(),
+                timestamp: .now,
                 agentEventTime: agentEventTime,
                 agentOwnerPanelID: ownerPanelId
             )

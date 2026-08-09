@@ -636,6 +636,6 @@ extension TimeInterval {
     public var isPlausibleControlAgentEventTime: Bool {
         isFinite
             && self >= 946_684_800
-            && self <= Date().timeIntervalSince1970 + 5 * 60
+            && self <= Date.now.timeIntervalSince1970 + 5 * 60
     }
 }

@@ -270,10 +270,11 @@ extension CMUXCLI {
 
     private static func timestampedAgentHookInvocation(
         executable: String,
-        arguments: String
+        arguments: String,
+        noOpSnippet: String
     ) -> String {
         let captureTime = agentHookCaptureTimeShell()
-        return #"CMUX_AGENT_HOOK_CAPTURED_AT="$(\#(captureTime))" \#(executable) \#(arguments)"#
+        return #"hook_captured_at="$(\#(captureTime))"; if [ -n "$hook_captured_at" ]; then CMUX_AGENT_HOOK_CAPTURED_AT="$hook_captured_at" \#(executable) \#(arguments); else \#(noOpSnippet); fi"#
     }
 
     private static let grokPinnedHookMarker = "cmux-grok-hook-v2"
@@ -291,11 +292,13 @@ extension CMUXCLI {
         let noOpSnippet = shellNoOpSnippet(noOpCommand)
         let socketInvocation = timestampedAgentHookInvocation(
             executable: #""$cmux_cli""#,
-            arguments: #"--socket "$CMUX_SOCKET_PATH" \#(routedArguments)"#
+            arguments: #"--socket "$CMUX_SOCKET_PATH" \#(routedArguments)"#,
+            noOpSnippet: noOpSnippet
         )
         let directInvocation = timestampedAgentHookInvocation(
             executable: #""$cmux_cli""#,
-            arguments: routedArguments
+            arguments: routedArguments,
+            noOpSnippet: noOpSnippet
         )
         return "cmux_cli=\"${CMUX_BUNDLED_CLI_PATH:-}\"; if [ -z \"$cmux_cli\" ] || [ ! -x \"$cmux_cli\" ]; then cmux_cli=\"$(command -v cmux 2>/dev/null || true)\"; fi; if [ -n \"$CMUX_SURFACE_ID\" ] && [ \"$\(def.disableEnvVar)\" != \"1\" ] && [ -n \"$cmux_cli\" ]; then { if [ -n \"${CMUX_SOCKET_PATH:-}\" ]; then \(socketInvocation); else \(directInvocation); fi; } || \(noOpSnippet); else \(noOpSnippet); fi"
     }
@@ -309,11 +312,13 @@ extension CMUXCLI {
         let noOpSnippet = shellNoOpSnippet(noOpCommand)
         let socketInvocation = timestampedAgentHookInvocation(
             executable: #""$cmux_cli""#,
-            arguments: #"--socket "$CMUX_SOCKET_PATH" \#(routedArguments)"#
+            arguments: #"--socket "$CMUX_SOCKET_PATH" \#(routedArguments)"#,
+            noOpSnippet: noOpSnippet
         )
         let directInvocation = timestampedAgentHookInvocation(
             executable: #""$cmux_cli""#,
-            arguments: routedArguments
+            arguments: routedArguments,
+            noOpSnippet: noOpSnippet
         )
         return "cmux_cli=\"${CMUX_BUNDLED_CLI_PATH:-}\"; if [ -z \"$cmux_cli\" ] || [ ! -x \"$cmux_cli\" ]; then cmux_cli=\"$(command -v cmux 2>/dev/null || true)\"; fi; if [ -n \"$CMUX_SURFACE_ID\" ] && [ \"$\(def.disableEnvVar)\" != \"1\" ] && [ -n \"$cmux_cli\" ]; then if [ -n \"${CMUX_SOCKET_PATH:-}\" ]; then \(socketInvocation); else \(directInvocation); fi; status=$?; if [ \"$status\" -eq 2 ]; then exit 2; fi; if [ \"$status\" -ne 0 ]; then \(noOpSnippet); fi; else \(noOpSnippet); fi"
     }
@@ -356,7 +361,8 @@ extension CMUXCLI {
         let fallbackInvocation = pinnedHookInvocation(
             executable: "cmux",
             routedArguments: routedArguments,
-            socketPath: socketPath
+            socketPath: socketPath,
+            noOpSnippet: noOpSnippet
         )
         let dispatch: String
         if let cliPath = pinnedAgentHookCLIPath() {
@@ -364,7 +370,8 @@ extension CMUXCLI {
             let primaryInvocation = pinnedHookInvocation(
                 executable: quotedCLIPath,
                 routedArguments: routedArguments,
-                socketPath: socketPath
+                socketPath: socketPath,
+                noOpSnippet: noOpSnippet
             )
             dispatch = "if [ -x \(quotedCLIPath) ]; then \(primaryInvocation); elif command -v cmux >/dev/null 2>&1; then \(fallbackInvocation); else \(noOpSnippet); fi"
         } else {
@@ -376,17 +383,20 @@ extension CMUXCLI {
     private static func pinnedHookInvocation(
         executable: String,
         routedArguments: String,
-        socketPath: String?
+        socketPath: String?,
+        noOpSnippet: String
     ) -> String {
         if let socketPath {
             return timestampedAgentHookInvocation(
                 executable: executable,
-                arguments: "--socket \(shellSingleQuote(socketPath)) \(routedArguments)"
+                arguments: "--socket \(shellSingleQuote(socketPath)) \(routedArguments)",
+                noOpSnippet: noOpSnippet
             )
         }
         return timestampedAgentHookInvocation(
             executable: executable,
-            arguments: routedArguments
+            arguments: routedArguments,
+            noOpSnippet: noOpSnippet
         )
     }
 

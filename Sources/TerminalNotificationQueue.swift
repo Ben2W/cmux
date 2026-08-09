@@ -1,3 +1,4 @@
+import CmuxControlSocket
 import CmuxRemoteSession
 import Foundation
 
@@ -539,9 +540,10 @@ final class TerminalMutationBus: @unchecked Sendable {
                     claimedTabId: claimedTabId,
                     surfaceId: surfaceId
                 ), let liveSurfaceId = target.surfaceId else { continue }
-                let manager = AppDelegate.shared?.tabManagerFor(tabId: target.tabId) ?? AppDelegate.shared?.tabManager
-                guard let workspace = manager?.workspacesById[target.tabId],
-                      workspace.acceptAgentRuntimeMutation(
+                guard let owner = TerminalController.shared.controlSidebarResolvePanelOwner(
+                    target: .workspace(target.tabId),
+                    panelID: liveSurfaceId
+                ), owner.acceptAgentRuntimeMutation(
                           statusKey: statusKey,
                           panelId: liveSurfaceId,
                           agentEventTime: eventTime,

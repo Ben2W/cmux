@@ -33,7 +33,7 @@ public struct SidebarStatusEntry: Equatable, Sendable {
         url: URL? = nil,
         priority: Int = 0,
         format: SidebarMetadataFormat = .plain,
-        timestamp: Date = Date(),
+        timestamp: Date = .now,
         agentEventTime: TimeInterval? = nil,
         agentOwnerPanelID: UUID? = nil
     ) {

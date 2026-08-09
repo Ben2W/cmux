@@ -5216,7 +5216,7 @@ final class Workspace: Identifiable, ObservableObject {
         let removed = surfaceResumeBindingsByPanelId.removeValue(forKey: panelId)
         recordSurfaceResumeBindingMutation(
             panelId: panelId,
-            eventTime: eventTime ?? Date().timeIntervalSince1970
+            eventTime: eventTime ?? Date.now.timeIntervalSince1970
         )
         return removed != nil
     }

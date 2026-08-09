@@ -345,6 +345,33 @@ def expect(condition: bool, message: str, failures: list[str]) -> None:
         failures.append(message)
 
 
+def expect_fail_closed_timestamped_hook(
+    command: str,
+    context: str,
+    failures: list[str],
+) -> None:
+    expected_fragments = (
+        'hook_captured_at="$(',
+        'if [ -z "$hook_captured_at" ]; then',
+        '/bin/cat >/dev/null 2>/dev/null || true',
+        'printf "{}',
+        'exit 0; fi;',
+        'CMUX_AGENT_HOOK_CAPTURED_AT="$hook_captured_at"',
+        '"${CMUX_CLAUDE_HOOK_CMUX_BIN:-cmux}"',
+    )
+    cursor = 0
+    for fragment in expected_fragments:
+        index = command.find(fragment, cursor)
+        expect(
+            index >= cursor,
+            f"{context} hook should contain {fragment!r} after its prior ordering guard, got {command!r}",
+            failures,
+        )
+        if index < cursor:
+            return
+        cursor = index + len(fragment)
+
+
 def decode_nul_argv(encoded: str) -> list[str]:
     raw = base64.b64decode(encoded)
     parts = raw.split(b"\0")
@@ -531,6 +558,14 @@ def test_live_socket_injects_supported_hooks_without_unlocking_bypass(failures: 
     hooks = settings.get("hooks", {})
     expected_hooks = {"SessionStart", "Stop", "SubagentStop", "SessionEnd", "Notification", "UserPromptSubmit", "PreToolUse", "PostToolUse", "PermissionRequest"}
     expect(set(hooks.keys()) == expected_hooks, f"unexpected hook keys: {hooks.keys()}, expected {expected_hooks}", failures)
+    for hook_name, groups in hooks.items():
+        for group_index, group in enumerate(groups):
+            for hook_index, hook in enumerate(group.get("hooks", [])):
+                expect_fail_closed_timestamped_hook(
+                    hook.get("command", ""),
+                    f"{hook_name}[{group_index}].hooks[{hook_index}]",
+                    failures,
+                )
     for hook_name, expected_subcommand in {
         "SessionStart": "session-start",
         "Stop": "stop",
@@ -540,7 +575,9 @@ def test_live_socket_injects_supported_hooks_without_unlocking_bypass(failures: 
     }.items():
         hook_command = hooks.get(hook_name, [{}])[0].get("hooks", [{}])[0].get("command", "")
         expect(
-            hook_command == f'"${{CMUX_CLAUDE_HOOK_CMUX_BIN:-cmux}}" hooks claude {expected_subcommand}',
+            hook_command.endswith(
+                f'"${{CMUX_CLAUDE_HOOK_CMUX_BIN:-cmux}}" hooks claude {expected_subcommand}'
+            ),
             f"{hook_name} hook should pin bundled cmux, got {hook_command!r}",
             failures,
         )
@@ -551,7 +588,9 @@ def test_live_socket_injects_supported_hooks_without_unlocking_bypass(failures: 
         cron_guard_hooks = cron_guard_groups[0].get("hooks", [])
         expect(
             any(
-                h.get("command") == '"${CMUX_CLAUDE_HOOK_CMUX_BIN:-cmux}" hooks claude cron-create-guard'
+                h.get("command", "").endswith(
+                    '"${CMUX_CLAUDE_HOOK_CMUX_BIN:-cmux}" hooks claude cron-create-guard'
+                )
                 and h.get("async") is not True
                 for h in cron_guard_hooks
             ),
@@ -573,7 +612,9 @@ def test_live_socket_injects_supported_hooks_without_unlocking_bypass(failures: 
         push_hooks = push_notification_groups[0].get("hooks", [])
         expect(
             any(
-                h.get("command") == '"${CMUX_CLAUDE_HOOK_CMUX_BIN:-cmux}" hooks claude push-notification'
+                h.get("command", "").endswith(
+                    '"${CMUX_CLAUDE_HOOK_CMUX_BIN:-cmux}" hooks claude push-notification'
+                )
                 and h.get("async") is True
                 for h in push_hooks
             ),
@@ -595,14 +636,21 @@ def test_live_socket_injects_supported_hooks_without_unlocking_bypass(failures: 
     )
     permission_request_hooks = hooks.get("PermissionRequest", [{}])[0].get("hooks", [{}])
     expect(
-        any(h.get("command") == '"${CMUX_CLAUDE_HOOK_CMUX_BIN:-cmux}" hooks feed --source claude' for h in permission_request_hooks),
+        any(
+            h.get("command", "").endswith(
+                '"${CMUX_CLAUDE_HOOK_CMUX_BIN:-cmux}" hooks feed --source claude'
+            )
+            for h in permission_request_hooks
+        ),
         f"PermissionRequest hook should call hooks feed, got {permission_request_hooks}",
         failures,
     )
     subagent_stop_hooks = hooks.get("SubagentStop", [{}])[0].get("hooks", [{}])
     expect(
         any(
-            h.get("command") == '"${CMUX_CLAUDE_HOOK_CMUX_BIN:-cmux}" hooks feed --source claude'
+            h.get("command", "").endswith(
+                '"${CMUX_CLAUDE_HOOK_CMUX_BIN:-cmux}" hooks feed --source claude'
+            )
             and h.get("async") is True
             for h in subagent_stop_hooks
         ),

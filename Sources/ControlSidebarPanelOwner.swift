@@ -191,6 +191,35 @@ enum ControlSidebarPanelOwner {
         }
     }
 
+    @discardableResult
+    func acceptAgentRuntimeMutation(
+        statusKey: String,
+        panelId: UUID?,
+        agentEventTime: TimeInterval?,
+        enforceOrdering: Bool,
+        isLifecycleMutation: Bool = false
+    ) -> Bool {
+        switch self {
+        case .workspace(let workspace):
+            workspace.acceptAgentRuntimeMutation(
+                statusKey: statusKey,
+                panelId: panelId,
+                agentEventTime: agentEventTime,
+                enforceOrdering: enforceOrdering,
+                isLifecycleMutation: isLifecycleMutation
+            )
+        case .dock(let dock):
+            guard let panelId else { return false }
+            return dock.acceptAgentRuntimeMutation(
+                statusKey: statusKey,
+                panelId: panelId,
+                agentEventTime: agentEventTime,
+                enforceOrdering: enforceOrdering,
+                isLifecycleMutation: isLifecycleMutation
+            )
+        }
+    }
+
     private static func normalizedOptionValue(_ value: String?) -> String? {
         guard let value else { return nil }
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)

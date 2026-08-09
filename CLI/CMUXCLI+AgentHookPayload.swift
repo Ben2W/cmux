@@ -96,7 +96,7 @@ extension CMUXCLI {
         // after normalizing millisecond epochs, so a future value cannot poison
         // ordering permanently.
         guard seconds >= 946_684_800,
-              seconds <= Date().timeIntervalSince1970 + 5 * 60 else { return nil }
+              seconds <= Date.now.timeIntervalSince1970 + 5 * 60 else { return nil }
         return seconds
     }
 

@@ -3418,6 +3418,8 @@ final class CLINotifyProcessIntegrationTests: XCTestCase {
             $0.isNumber || $0 == "."
         }
         return TimeInterval(String(rawValue))
+    }
+
     override func tearDown() {
         // The mock servers park an accept loop on the test's listener FD, and
         // closing that FD does not wake a thread already blocked in poll/accept.
