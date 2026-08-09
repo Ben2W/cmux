@@ -1285,7 +1285,7 @@ final class AppDelegateIssue2907RoutingTests: XCTestCase {
 
         let workspace = try XCTUnwrap(manager.selectedWorkspace)
         let panelId = try XCTUnwrap(workspace.focusedPanelId)
-        let currentEventTime = Date().timeIntervalSince1970
+        let currentEventTime = Date.now.timeIntervalSince1970
         XCTAssertTrue(workspace.setSurfaceResumeBinding(
             SurfaceResumeBindingSnapshot(
                 command: "codex resume private-session",

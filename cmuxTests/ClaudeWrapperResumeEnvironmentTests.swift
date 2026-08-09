@@ -226,10 +226,10 @@ import Testing
         preToolUse.standardError = FileHandle.nullDevice
         preToolUseInput.fileHandleForWriting.write(Data(#"{"tool_name":"Bash"}"#.utf8))
         try preToolUseInput.fileHandleForWriting.close()
-        let preToolUseStartedAt = Date()
+        let preToolUseStartedAt = Date.now
         try runWithBoundedWait(preToolUse, shellDescription: "Claude PreToolUse admission shim")
         #expect(
-            Date().timeIntervalSince(preToolUseStartedAt) < 0.75,
+            Date.now.timeIntervalSince(preToolUseStartedAt) < 0.75,
             "PreToolUse admission must return before the detached cmux bookkeeping finishes"
         )
 
@@ -331,7 +331,7 @@ import Testing
         #expect(rawTimes.count == 4)
         let times = try rawTimes.map { try #require(Double($0)) }
         #expect(times.allSatisfy { $0.isFinite && $0 > 0 })
-        let maximumAcceptedCaptureTime = Date().timeIntervalSince1970 + 5 * 60
+        let maximumAcceptedCaptureTime = Date.now.timeIntervalSince1970 + 5 * 60
         #expect(
             times.allSatisfy { $0 <= maximumAcceptedCaptureTime },
             "A poisoned future clock state must not become the emitted ordering watermark"

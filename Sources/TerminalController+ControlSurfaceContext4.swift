@@ -9,7 +9,6 @@ import CmuxWorkspaces
 /// Split out of `TerminalController+ControlSurfaceContext` to keep the
 /// conformance readable; see that file's doc comment for the overview.
 extension TerminalController {
-
     // MARK: - token parsers
 
     nonisolated func controlSurfaceParseShellActivityState(_ rawState: String) -> String? {

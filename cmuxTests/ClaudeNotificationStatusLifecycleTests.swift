@@ -219,7 +219,7 @@ struct ClaudeNotificationStatusLifecycleTests {
             ttyName: "ttys-claude-future-payload-time",
             storeURL: storeURL
         )
-        let futureTime = Date().timeIntervalSince1970 + 86_400
+        let futureTime = Date.now.timeIntervalSince1970 + 86_400
         let start = harness.runProcess(
             executablePath: context.cliPath,
             arguments: ["hooks", "claude", "session-start"],

@@ -361,7 +361,7 @@ func verifyAgentHookClockSamplesOnlyAfterLockAcquisition(
     }
     try #require(clockReachedLock, "Agent hook clock never reached its shared lock")
     Thread.sleep(forTimeInterval: lockHoldDuration)
-    let unlockBoundary = Date().timeIntervalSince1970
+    let unlockBoundary = Date.now.timeIntervalSince1970
 
     guard cmuxTestFlock(lockFD, LOCK_UN) == 0 else {
         throw NSError(domain: "cmux.tests.agent-hook-clock", code: Int(errno))
@@ -393,7 +393,7 @@ func verifyAgentHookClockSurvivesBackwardWallClock(
     try fileManager.createDirectory(at: clockDirectory, withIntermediateDirectories: true)
     try fileManager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: clockDirectory.path)
 
-    let logicalDate = Date().addingTimeInterval(10 * 60)
+    let logicalDate = Date.now.addingTimeInterval(10 * 60)
     let seededMicros = Int64(logicalDate.timeIntervalSince1970 * 1_000_000)
     try "\(seededMicros)\n".write(to: stateURL, atomically: true, encoding: .utf8)
     try fileManager.setAttributes([.modificationDate: logicalDate], ofItemAtPath: stateURL.path)

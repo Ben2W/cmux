@@ -50,7 +50,9 @@ extension Workspace {
         } else {
             return
         }
-        guard observation.lifecycle == .idle,
+        guard eventTime.isFinite,
+              eventTime > 0,
+              observation.lifecycle == .idle,
               Date.now.timeIntervalSince1970 - eventTime >= Self.agentRunningStatusReconciliationDelay,
               let statusKey,
               agentLifecycleStatesByPanelId[panelId]?[statusKey] == .running else {

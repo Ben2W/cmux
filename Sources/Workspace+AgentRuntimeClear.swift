@@ -1,11 +1,12 @@
 import Foundation
 
+/// Admission result for one pane-scoped agent runtime mutation.
 struct AgentRuntimeMutationOrderingDecision {
     let isAccepted: Bool
     let retainedEventTime: TimeInterval?
 }
 
-enum AgentRuntimeMutationOrdering {
+struct AgentRuntimeMutationOrdering {
     static func decision(
         statusKey: String,
         lifecycleEventTime: TimeInterval?,

@@ -183,20 +183,6 @@ extension DockSplitStore {
         )
     }
 
-    func agentRuntimeStatusEntry(key: String, panelId: UUID) -> SidebarStatusEntry? {
-        agentRuntimeByPanelId[panelId]?.statusEntries[key]
-    }
-
-    func setAgentRuntimeStatusEntry(
-        _ entry: SidebarStatusEntry,
-        key: String,
-        panelId: UUID
-    ) {
-        mutateAgentRuntime(panelId: panelId) {
-            $0.statusEntries[key] = entry
-        }
-    }
-
     @discardableResult
     func upsertAgentRuntimeStatusEntry(
         key: String,

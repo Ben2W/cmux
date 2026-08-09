@@ -2,6 +2,7 @@ import XCTest
 import Darwin
 import Dispatch
 
+/// The unchecked Sendable conformance is safe because the lock protects the one-shot stopped flag.
 final class MockSocketServerToken: @unchecked Sendable {
     private let listenerFD: Int32
     private let generation: UUID?

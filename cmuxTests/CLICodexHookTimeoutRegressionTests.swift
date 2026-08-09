@@ -382,7 +382,7 @@ struct CLICodexHookTimeoutRegressionTests {
             atomically: true,
             encoding: .utf8
         )
-        let maximumAcceptedCaptureTime = Date().timeIntervalSince1970 + 5 * 60
+        let maximumAcceptedCaptureTime = Date.now.timeIntervalSince1970 + 5 * 60
         let run = runCodexHookProcess(
             executablePath: "/bin/sh",
             arguments: ["-c", command],
@@ -936,7 +936,7 @@ struct CLICodexHookTimeoutRegressionTests {
             try? FileManager.default.removeItem(at: root)
         }
 
-        let now = Date().timeIntervalSince1970
+        let now = Date.now.timeIntervalSince1970
         let store: [String: Any] = [
             "version": 1,
             "sessions": [
@@ -1018,7 +1018,7 @@ struct CLICodexHookTimeoutRegressionTests {
             try? FileManager.default.removeItem(at: root)
         }
 
-        let now = Date().timeIntervalSince1970
+        let now = Date.now.timeIntervalSince1970
         let idleStopEventTime = now
         let staleRunningEventTime = now - 1
         let store: [String: Any] = [

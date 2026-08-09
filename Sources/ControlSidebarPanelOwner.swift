@@ -32,23 +32,6 @@ enum ControlSidebarPanelOwner {
         }
     }
 
-    func statusEntry(key: String, panelId: UUID?) -> SidebarStatusEntry? {
-        switch self {
-        case .workspace(let workspace): workspace.statusEntries[key]
-        case .dock(let dock):
-            panelId.flatMap { dock.agentRuntimeStatusEntry(key: key, panelId: $0) }
-        }
-    }
-
-    func setStatusEntry(_ entry: SidebarStatusEntry, key: String, panelId: UUID?) {
-        switch self {
-        case .workspace(let workspace): workspace.statusEntries[key] = entry
-        case .dock(let dock):
-            guard let panelId else { return }
-            dock.setAgentRuntimeStatusEntry(entry, key: key, panelId: panelId)
-        }
-    }
-
     @discardableResult
     func upsertStatusEntry(
         key: String,

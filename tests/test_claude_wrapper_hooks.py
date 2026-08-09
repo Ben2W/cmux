@@ -622,7 +622,8 @@ def test_live_socket_injects_supported_hooks_without_unlocking_bypass(failures: 
             failures,
         )
 
-    # General PreToolUse telemetry should remain async to avoid blocking tool execution.
+    # The outer hook must synchronously reserve its ordering timestamp and stdin.
+    # Its command then detaches the cmux delivery so tool execution does not wait.
     pre_tool_use_hooks = [
         hook
         for group in pre_tool_use_groups
@@ -630,8 +631,8 @@ def test_live_socket_injects_supported_hooks_without_unlocking_bypass(failures: 
         if "pre-tool-use" in hook.get("command", "")
     ]
     expect(
-        any(h.get("async") is True for h in pre_tool_use_hooks),
-        f"PreToolUse hook should have async:true, got {pre_tool_use_hooks}",
+        any(h.get("async") is not True for h in pre_tool_use_hooks),
+        f"PreToolUse hook should synchronously reserve ordering before detaching, got {pre_tool_use_hooks}",
         failures,
     )
     permission_request_hooks = hooks.get("PermissionRequest", [{}])[0].get("hooks", [{}])

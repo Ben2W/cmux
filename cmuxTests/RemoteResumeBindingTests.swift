@@ -436,7 +436,7 @@ struct RemoteResumeBindingTests {
 
         let workspace = try #require(manager.selectedWorkspace)
         let surfaceID = try #require(workspace.focusedPanelId)
-        let initialEventTime = Date().timeIntervalSince1970 - 300
+        let initialEventTime = Date.now.timeIntervalSince1970 - 300
         let setResult = try v2Result(request: [
             "id": "ordered-resume-set",
             "method": "surface.resume.set",
@@ -602,7 +602,7 @@ struct RemoteResumeBindingTests {
 
         let workspace = try #require(manager.selectedWorkspace)
         let surfaceID = try #require(workspace.focusedPanelId)
-        let originalEventTime = Date().timeIntervalSince1970 - 60
+        let originalEventTime = Date.now.timeIntervalSince1970 - 60
         _ = try v2Result(request: [
             "id": "internal-clear-initial-set",
             "method": "surface.resume.set",

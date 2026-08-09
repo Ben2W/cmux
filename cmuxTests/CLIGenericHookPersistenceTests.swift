@@ -719,7 +719,7 @@ extension CLINotifyProcessIntegrationRegressionTests {
         let workspaceId = "11111111-1111-1111-1111-111111111111"
         let surfaceId = "22222222-2222-2222-2222-222222222222"
         let sessionId = "hermes-session-end-123"
-        let baseEventTime = Date().timeIntervalSince1970 - 1_000
+        let baseEventTime = Date.now.timeIntervalSince1970 - 1_000
         let sessionStartTime = baseEventTime
         let stopTime = baseEventTime + 100
         let turnBoundaryTime = baseEventTime + 200
@@ -1198,11 +1198,11 @@ extension CLINotifyProcessIntegrationRegressionTests {
         ) { _ in
             "OK"
         }
-        let startedAt = Date()
+        let startedAt = Date.now
         server.shutdown()
 
         XCTAssertLessThan(
-            Date().timeIntervalSince(startedAt),
+            Date.now.timeIntervalSince(startedAt),
             2,
             "Shutting down a scoped mock server must unblock and join a waiting accept thread"
         )

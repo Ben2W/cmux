@@ -247,12 +247,12 @@ extension DockSplitStore {
             if let scrollback {
                 restoredTerminalScrollbackByPanelId[panelId] = scrollback
             }
-        let resumeBindingEventTime: TimeInterval? = [
+            let resumeBindingEventTime: TimeInterval? = [
                 surfaceResumeBindingEventTimesByPanelId[panelId],
-            transfer?.resumeBindingEventTime,
-            resumeBinding?.updatedAt,
-        ].compactMap { $0 }.max()
-        let sessionFontSize: Float32?
+                transfer?.resumeBindingEventTime,
+                resumeBinding?.updatedAt,
+            ].compactMap { $0 }.max()
+            let sessionFontSize: Float32?
             let sessionFontSizeChangeTokens: [UUID]?
             if let terminalFontSizeSnapshotProjection {
                 let projection =
@@ -267,8 +267,8 @@ extension DockSplitStore {
                 sessionFontSize =
                     terminal.surface
                         .sessionFontSizeOverrideBasePoints()
-            sessionFontSizeChangeTokens = nil
-        }
+                sessionFontSizeChangeTokens = nil
+            }
             terminalSnapshot = SessionTerminalPanelSnapshot(
                 workingDirectory: directory,
                 fontSize: sessionFontSize,
