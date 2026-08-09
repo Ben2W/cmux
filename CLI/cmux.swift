@@ -26055,7 +26055,7 @@ struct CMUXCLI {
 
     func agentEventTimeOption(_ eventTime: TimeInterval?) -> String {
         guard let eventTime else { return "" }
-        return " --agent-event-time=\(String(format: "%.6f", eventTime))"
+        return " --agent-event-time=\(AgentHookWireFormat.eventTime(eventTime))"
     }
 
     private func agentNotificationClearOrderingOptions(
@@ -27722,7 +27722,7 @@ struct CMUXCLI {
         }
         if let agentEventTime {
             monitorArgs.append(
-                "--agent-event-time=\(String(format: "%.6f", locale: Locale(identifier: "en_US_POSIX"), agentEventTime))"
+                "--agent-event-time=\(AgentHookWireFormat.eventTime(agentEventTime))"
             )
         }
         process.arguments = monitorArgs

@@ -6,6 +6,17 @@ enum AgentHookNotificationStatus: String, Codable {
     case error
 }
 
+/// Locale-stable values shared by every agent-hook wire protocol.
+struct AgentHookWireFormat {
+    static func eventTime(_ value: TimeInterval) -> String {
+        String(
+            format: "%.6f",
+            locale: Locale(identifier: "en_US_POSIX"),
+            value
+        )
+    }
+}
+
 /// Category tag the app uses to gate agent notifications by user config.
 /// Serialized into the `notify_target_async` payload's optional meta segment.
 enum AgentHookNotifyCategory: String {
@@ -28,11 +39,7 @@ enum AgentHookNotifyCategory: String {
            let eventTime,
            eventTime.isFinite,
            eventTime > 0 {
-            let eventTimeText = String(
-                format: "%.6f",
-                locale: Locale(identifier: "en_US_POSIX"),
-                eventTime
-            )
+            let eventTimeText = AgentHookWireFormat.eventTime(eventTime)
             return "c=\(rawValue);p=\(pending ? 1 : 0);k=\(statusKey);t=\(eventTimeText)"
         }
         guard self != .other else { return nil }
