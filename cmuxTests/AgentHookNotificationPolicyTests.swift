@@ -108,6 +108,10 @@ struct AgentHookNotificationPolicyTests {
         ) == false)
     }
 
+    @Test func orderedEventTimeUsesLocaleInvariantWireFormat() {
+        #expect(AgentHookWireFormat.eventTime(1_700_000_000.25) == "1700000000.250000")
+    }
+
     @Test func piNotificationTitleIncludesSurfaceTitle() {
         #expect(
             AgentHookNotificationPolicy.notificationTitle(
