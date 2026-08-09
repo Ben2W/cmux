@@ -284,6 +284,73 @@ extension AgentNotificationRegressionTests {
         )
     }
 
+    @Test("Dock-owned notifications use the pane runtime ordering watermark")
+    func dockOwnedNotificationsUsePaneRuntimeOrderingWatermark() throws {
+        let fixture = try makeFixture()
+        defer { fixture.restore() }
+        let bus = TerminalMutationBus.shared
+        bus.discardPendingNotifications()
+        defer { bus.discardPendingNotifications() }
+
+        let dock = fixture.source.dockSplit
+        let transfer = try #require(fixture.source.detachSurface(panelId: fixture.panelId))
+        let rootPane = try #require(dock.bonsplitController.allPaneIds.first)
+        #expect(dock.attachDetachedSurface(transfer, inPane: rootPane, focus: false) == fixture.panelId)
+        #expect(dock.setAgentLifecycle(
+            key: "claude_code",
+            panelId: fixture.panelId,
+            lifecycle: .idle,
+            agentEventTime: 200,
+            enforceAgentEventOrdering: true
+        ))
+
+        bus.enqueueNotification(
+            tabId: fixture.source.id,
+            surfaceId: fixture.panelId,
+            title: "Claude Code",
+            subtitle: "Completed",
+            body: "Stale Dock notification",
+            agentStatusKey: "claude_code",
+            agentEventTime: 100,
+            coalesces: false
+        )
+        bus.enqueueNotification(
+            tabId: fixture.source.id,
+            surfaceId: fixture.panelId,
+            title: "Claude Code",
+            subtitle: "Completed",
+            body: "Current Dock notification",
+            agentStatusKey: "claude_code",
+            agentEventTime: 300,
+            coalesces: false
+        )
+        bus.drainForTesting()
+
+        #expect(!fixture.store.notifications.contains { $0.body == "Stale Dock notification" })
+        #expect(fixture.store.notifications.contains { $0.body == "Current Dock notification" })
+        #expect(
+            dock.agentRuntimeByPanelId[fixture.panelId]?.agentLifecycleEventTimes["claude_code"] == 300
+        )
+
+        bus.enqueueAgentNotificationClear(
+            forTabId: fixture.source.id,
+            surfaceId: fixture.panelId,
+            statusKey: "claude_code",
+            agentEventTime: 250
+        )
+        bus.drainForTesting()
+        #expect(fixture.store.notifications.contains { $0.body == "Current Dock notification" })
+
+        bus.enqueueAgentNotificationClear(
+            forTabId: fixture.source.id,
+            surfaceId: fixture.panelId,
+            statusKey: "claude_code",
+            agentEventTime: 400
+        )
+        bus.drainForTesting()
+        #expect(!fixture.store.notifications.contains { $0.body == "Current Dock notification" })
+    }
+
     @Test("A stale source clear preserves a destination-confined stored notification")
     func staleSourceClearPreservesDestinationConfinedStoredNotification() throws {
         let fixture = try makeFixture()
