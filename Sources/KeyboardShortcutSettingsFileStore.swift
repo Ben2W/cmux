@@ -962,7 +962,11 @@ final class CmuxSettingsFileStore {
         } else if section.keys.contains("showModifierHoldHints") {
             logInvalid("shortcuts.showModifierHoldHints", sourcePath: sourcePath)
         }
-        for (key, rawValue) in section where key != "bindings" && key != "showModifierHoldHints" && key != "when" {
+        for (key, rawValue) in section
+        where key != "bindings"
+            && key != "pluginBindings"
+            && key != "showModifierHoldHints"
+            && key != "when" {
             bindings[key] = rawValue
         }
 
