@@ -847,7 +847,7 @@ enum KeyboardShortcutSettings {
         case numberedDigitFamily
     }
 
-    private static func shortcutsConflict(
+    static func shortcutsConflict(
         _ proposedShortcut: StoredShortcut,
         proposedUsesNumberedDigitMatching: Bool,
         _ configuredShortcut: StoredShortcut,

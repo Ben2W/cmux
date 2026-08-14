@@ -18,6 +18,8 @@ private let hostSettingsLogger = Logger(subsystem: "com.cmuxterm.app", category:
 @MainActor
 final class HostSettingsActions: SettingsHostActions {
     private let configFileURL: URL
+    /// App-owned plugin runtime shared with the plugin-focused extension files.
+    let pluginRuntime: CmuxPluginRuntime
 
     /// Serializes font-size config writes so rapid slider saves persist in order.
     private let fontConfigWriter = FontConfigWriter()
@@ -44,8 +46,9 @@ final class HostSettingsActions: SettingsHostActions {
     private var configWindow: NSWindow?
     private var configWindowCloseObserver: WindowCloseObserver?
 
-    init(configFileURL: URL) {
+    init(configFileURL: URL, pluginRuntime: CmuxPluginRuntime) {
         self.configFileURL = configFileURL
+        self.pluginRuntime = pluginRuntime
         startObservingAppIconMode()
     }
 

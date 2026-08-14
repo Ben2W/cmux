@@ -19,8 +19,8 @@ public protocol SettingsHostActions: AnyObject {
     /// Returns discovered plugins and their current approval state.
     func pluginManagementDescriptors() -> [PluginManagementDescriptor]
 
-    /// Approves all scopes declared by a plugin after explicit user review.
-    func approvePlugin(_ pluginID: String)
+    /// Atomically approves all declared scopes and enables the reviewed plugin.
+    func approveAndEnablePlugin(_ pluginID: String)
 
     /// Enables or disables a previously approved plugin.
     func setPluginEnabled(_ enabled: Bool, pluginID: String)
@@ -244,7 +244,7 @@ public extension SettingsHostActions {
     func pluginManagementDescriptors() -> [PluginManagementDescriptor] { [] }
 
     /// Default no-op approval for previews.
-    func approvePlugin(_ pluginID: String) {}
+    func approveAndEnablePlugin(_ pluginID: String) {}
 
     /// Default no-op enablement for previews.
     func setPluginEnabled(_ enabled: Bool, pluginID: String) {}

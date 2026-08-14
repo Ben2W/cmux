@@ -826,6 +826,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     /// `ContentView` environment so `@LiveSetting` can resolve the stores it
     /// observes inside the sidebar.
     var settingsRuntime: SettingsRuntime?
+    /// Process-wide plugin graph owned by the app composition root and injected
+    /// into Settings, SwiftUI, shortcut routing, and the control socket.
+    let pluginRuntime = CmuxPluginRuntime()
     weak var fileExplorerState: FileExplorerState?
     weak var fullscreenControlsViewModel: TitlebarControlsViewModel?
     weak var sidebarSelectionState: SidebarSelectionState?
@@ -1387,7 +1390,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         // Discover user-installed plugins off the main actor. The runtime
         // starts disabled by default; Settings approval is required before a
         // plugin can receive events or contribute actions.
-        CmuxPluginRuntime.shared.start()
+        pluginRuntime.start()
         let env = ProcessInfo.processInfo.environment
         let telemetryEnabled = TelemetrySettings.enabledForCurrentLaunch
         let sentryStartupPolicy = MacSentryStartupPolicy(
@@ -2245,7 +2248,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     func applicationWillTerminate(_ notification: Notification) {
         StartupBreadcrumbLog.append("appDelegate.willTerminate.begin")
-        CmuxPluginRuntime.shared.stop()
+        pluginRuntime.stop()
         // Backstop for any terminate path that did not route through
         // prepareForConfirmedAppTermination(). Normal confirmed termination has already
         // persisted a fresh index before AppKit receives its reply; do not overwrite that
@@ -2322,7 +2325,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         // available; adopt its coordinators so every later window shares them.
         pullRequestProbeService = tabManager.pullRequestProbeService
         self.settingsRuntime = settingsRuntime
-        CmuxPluginRuntime.shared.configure(jsonStore: settingsRuntime.jsonStore)
+        pluginRuntime.configure(jsonStore: settingsRuntime.jsonStore)
         self.notificationStore = notificationStore
         self.sidebarState = sidebarState
         self.auth = auth
@@ -2338,6 +2341,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         // pairedMacs backup so a fresh dev iOS build restores it (no manual host
         // entry). No-op on Release / when the flag is off.
         MacPairedMacBackupPublisher.shared.configure(auth: auth.coordinator)
+        TerminalController.shared.configurePluginRuntime(pluginRuntime)
         TerminalController.shared.attachAuth(coordinator: auth.coordinator, accountFlow: auth.accountFlow)
         TerminalController.shared.agentChatTranscriptService = agentChatTranscriptService
         if !isRunningUnderXCTest(ProcessInfo.processInfo.environment) {
@@ -9205,6 +9209,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             .environmentObject(cmuxConfigStore)
             .environment(\.sessionDragRegistry, sessionDragRegistry)
             .environment(\.tabDragTransferRegistry, tabDragTransferRegistry)
+            .environment(\.cmuxPluginRuntime, pluginRuntime)
             // AppKit hosts this ContentView in its own NSHostingView, which does
             // not inherit the App scene's SwiftUI environment. Inject the
             // settings runtime so `@LiveSetting` can resolve the stores it

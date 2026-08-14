@@ -177,7 +177,10 @@ struct cmuxApp: App {
             secretStore: secretStore,
             errorLog: SettingsErrorLog(),
             accountFlow: authComposition.accountFlow,
-            hostActions: HostSettingsActions(configFileURL: configFileURL)
+            hostActions: HostSettingsActions(
+                configFileURL: configFileURL,
+                pluginRuntime: appDelegate.pluginRuntime
+            )
         )
         StartupBreadcrumbLog.append("app.init.settingsRuntime.created")
 
