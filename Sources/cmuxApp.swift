@@ -167,6 +167,14 @@ struct cmuxApp: App {
         // Reconcile saved language preference before any UI loads
         LanguageSettingsStore(defaults: .standard).reconcileLanguageOverrideAtLaunch()
         StartupBreadcrumbLog.append("app.init.language.applied")
+        // `NSApplicationDelegateAdaptor` constructs and publishes the delegate
+        // before the App initializer runs. Read the shared instance here
+        // instead of touching the property-wrapper projection (`appDelegate`)
+        // while `settingsRuntime` is still being initialized; Swift's
+        // definite-initialization checker correctly rejects that self-access.
+        guard let pluginRuntime = AppDelegate.shared?.pluginRuntime else {
+            fatalError("AppDelegate must be initialized before cmuxApp settings")
+        }
         self.settingsRuntime = SettingsRuntime(
             catalog: settingsCatalog,
             userDefaultsStore: UserDefaultsSettingsStore(
@@ -179,7 +187,7 @@ struct cmuxApp: App {
             accountFlow: authComposition.accountFlow,
             hostActions: HostSettingsActions(
                 configFileURL: configFileURL,
-                pluginRuntime: appDelegate.pluginRuntime
+                pluginRuntime: pluginRuntime
             )
         )
         StartupBreadcrumbLog.append("app.init.settingsRuntime.created")
