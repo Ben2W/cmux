@@ -17,7 +17,8 @@ use super::{GlobalArgs, OutputMode, UsageError};
 const RESPONSE_LIMIT: usize = 16 * 1024 * 1024;
 const SERVER_PREFLIGHT_TIMEOUT: Duration = Duration::from_secs(2);
 const SUPPORTED_SERVER_APP: &str = "cmux-tui";
-const SUPPORTED_SERVER_PROTOCOL: u64 = cmux_tui_core::server::PROTOCOL_VERSION as u64;
+const MINIMUM_SERVER_PROTOCOL: u64 =
+    cmux_tui_core::server::SESSION_JOURNAL_PROTOCOL_VERSION as u64;
 
 pub(super) fn run(global: GlobalArgs, mut plan: RequestPlan) -> i32 {
     if plan.stream && global.output == OutputMode::Json {
@@ -194,7 +195,9 @@ fn validate_capability_identity(identity: &Value) -> Result<(), &'static str> {
     if identity.get("app").and_then(Value::as_str) != Some(SUPPORTED_SERVER_APP) {
         return Err("unexpected server app");
     }
-    if identity.get("protocol").and_then(Value::as_u64) != Some(SUPPORTED_SERVER_PROTOCOL) {
+    if identity.get("protocol").and_then(Value::as_u64).is_none_or(|protocol| {
+        protocol < MINIMUM_SERVER_PROTOCOL
+    }) {
         return Err("unsupported server protocol");
     }
     Ok(())
@@ -734,20 +737,30 @@ mod tests {
     }
 
     #[test]
-    fn capability_preflight_rejects_older_protocol_even_when_capability_is_present() {
+    fn capability_preflight_rejects_pre_capability_protocol_even_when_capability_is_present() {
         let identity = json!({
             "app": "cmux-tui",
-            "protocol": cmux_tui_core::server::PROTOCOL_VERSION - 1,
+            "protocol": cmux_tui_core::server::SESSION_JOURNAL_PROTOCOL_VERSION - 1,
             "capabilities": [cmux_tui_core::server::SESSION_JOURNAL_CAPABILITY],
         });
         assert_eq!(validate_capability_identity(&identity), Err("unsupported server protocol"));
     }
 
     #[test]
-    fn capability_preflight_accepts_current_identity() {
+    fn capability_preflight_accepts_capability_introduction_protocol() {
         let identity = json!({
             "app": "cmux-tui",
-            "protocol": cmux_tui_core::server::PROTOCOL_VERSION,
+            "protocol": cmux_tui_core::server::SESSION_JOURNAL_PROTOCOL_VERSION,
+            "capabilities": [cmux_tui_core::server::SESSION_JOURNAL_CAPABILITY],
+        });
+        assert_eq!(validate_capability_identity(&identity), Ok(()));
+    }
+
+    #[test]
+    fn capability_preflight_accepts_newer_protocol() {
+        let identity = json!({
+            "app": "cmux-tui",
+            "protocol": cmux_tui_core::server::PROTOCOL_VERSION + 1,
             "capabilities": [cmux_tui_core::server::SESSION_JOURNAL_CAPABILITY],
         });
         assert_eq!(validate_capability_identity(&identity), Ok(()));
