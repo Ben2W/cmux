@@ -31,17 +31,10 @@ enum AgentHookNotifyCategory: String {
     func metaSegment(
         pending: Bool,
         statusKey: String? = nil,
-        eventTime: TimeInterval? = nil
+        eventTime: TimeInterval? = nil,
+        agentKind: String? = nil,
+        isSubagent: Bool? = nil
     ) -> String? {
-        if let statusKey,
-           !statusKey.isEmpty,
-           statusKey.allSatisfy({ $0.isLetter || $0.isNumber || "._-".contains($0) }),
-           let eventTime,
-           eventTime.isFinite,
-           eventTime > 0 {
-            let eventTimeText = AgentHookWireFormat.eventTime(eventTime)
-            return "c=\(rawValue);p=\(pending ? 1 : 0);k=\(statusKey);t=\(eventTimeText)"
-        }
         guard self != .other else { return nil }
         var segment = "c=\(rawValue);p=\(pending ? 1 : 0)"
         if let agentKind, Self.isValidAgentKindTag(agentKind) {
@@ -50,7 +43,26 @@ enum AgentHookNotifyCategory: String {
         if let isSubagent {
             segment += ";n=\(isSubagent ? 1 : 0)"
         }
+        if let statusKey,
+           !statusKey.isEmpty,
+           statusKey.allSatisfy({ $0.isLetter || $0.isNumber || "._-".contains($0) }),
+           let eventTime,
+           eventTime.isFinite,
+           eventTime > 0 {
+            segment += ";k=\(statusKey);t=\(AgentHookWireFormat.eventTime(eventTime))"
+        }
         return segment
+    }
+
+    /// Compatibility overload for feed-hook agent metadata.
+    func metaSegment(pending: Bool, agentKind: String?, isSubagent: Bool?) -> String? {
+        metaSegment(
+            pending: pending,
+            statusKey: nil,
+            eventTime: nil,
+            agentKind: agentKind,
+            isSubagent: isSubagent
+        )
     }
 
     /// Mirror of the app-side `AgentNotificationMeta` slug grammar: 1-64
