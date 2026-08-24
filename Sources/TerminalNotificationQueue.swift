@@ -101,7 +101,8 @@ final class TerminalMutationBus: @unchecked Sendable {
             body: body,
             agentStatusKey: agentStatusKey,
             agentEventTime: agentEventTime,
-            replyShape: replyShape
+            replyShape: replyShape,
+            agent: agent
         ), coalesces: coalesces)
     }
 

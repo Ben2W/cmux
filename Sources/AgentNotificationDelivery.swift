@@ -31,6 +31,8 @@ struct AgentNotificationDelivery: Sendable {
         pending: Bool,
         agentStatusKey: String? = nil,
         agentEventTime: TimeInterval? = nil,
+        agentKind: String? = nil,
+        isSubagent: Bool? = nil,
         coalesces: Bool = false
     ) -> Bool {
         if let category,

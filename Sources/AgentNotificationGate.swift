@@ -24,12 +24,14 @@ enum AgentTurnCompleteMode: String {
 struct AgentNotificationMeta {
     let category: AgentNotifyCategory
     let pending: Bool
+    let agentKind: String?
+    let isSubagent: Bool?
     let agentStatusKey: String?
     let agentEventTime: TimeInterval?
 
     init?(meta: String) {
         let fields = meta.split(separator: ";", omittingEmptySubsequences: false)
-        guard fields.count == 2 || fields.count == 4,
+        guard fields.count >= 2,
               fields[0].hasPrefix("c="),
               fields[1].hasPrefix("p=") else { return nil }
         guard let known = AgentNotifyCategory(rawValue: String(fields[0].dropFirst(2))) else { return nil }
@@ -38,23 +40,45 @@ struct AgentNotificationMeta {
         case "0": self.pending = false
         default: return nil
         }
-        if fields.count == 2 {
-            guard known != .other else { return nil }
-            self.agentStatusKey = nil
-            self.agentEventTime = nil
-        } else {
-            guard fields[2].hasPrefix("k="), fields[3].hasPrefix("t=") else { return nil }
-            let statusKey = String(fields[2].dropFirst(2))
-            guard !statusKey.isEmpty,
-                  statusKey.allSatisfy({ $0.isLetter || $0.isNumber || "._-".contains($0) }),
-                  let eventTime = TimeInterval(fields[3].dropFirst(2)),
-                  eventTime.isPlausibleControlAgentEventTime else { return nil }
-            self.agentStatusKey = statusKey
-            self.agentEventTime = eventTime
+        var parsedAgentKind: String?
+        var parsedIsSubagent: Bool?
+        var parsedStatusKey: String?
+        var parsedEventTime: TimeInterval?
+        for field in fields.dropFirst(2) {
+            if field.hasPrefix("a=") {
+                guard parsedAgentKind == nil else { return nil }
+                let value = String(field.dropFirst(2))
+                guard Self.isValidAgentKindTag(value) else { return nil }
+                parsedAgentKind = value
+            } else if field.hasPrefix("n=") {
+                guard parsedIsSubagent == nil else { return nil }
+                switch field.dropFirst(2) {
+                case "1": parsedIsSubagent = true
+                case "0": parsedIsSubagent = false
+                default: return nil
+                }
+            } else if field.hasPrefix("k=") {
+                guard parsedStatusKey == nil else { return nil }
+                let value = String(field.dropFirst(2))
+                guard !value.isEmpty,
+                      value.allSatisfy({ $0.isLetter || $0.isNumber || "._-".contains($0) }) else { return nil }
+                parsedStatusKey = value
+            } else if field.hasPrefix("t=") {
+                guard parsedEventTime == nil,
+                      let value = TimeInterval(field.dropFirst(2)),
+                      value.isPlausibleControlAgentEventTime else { return nil }
+                parsedEventTime = value
+            } else {
+                return nil
+            }
         }
+        guard (parsedStatusKey == nil) == (parsedEventTime == nil) else { return nil }
+        guard known != .other || parsedStatusKey != nil else { return nil }
         self.category = known
-        self.agentKind = agentKind
-        self.isSubagent = isSubagent
+        self.agentKind = parsedAgentKind
+        self.isSubagent = parsedIsSubagent
+        self.agentStatusKey = parsedStatusKey
+        self.agentEventTime = parsedEventTime
     }
 
     /// Mirror of the CLI's `AgentHookNotifyCategory.isValidAgentKindTag` slug

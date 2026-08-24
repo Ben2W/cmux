@@ -47,7 +47,7 @@ enum ControlSidebarPanelOwner {
     ) -> SidebarStatusEntryReplacementDecision {
         switch self {
         case .workspace(let workspace):
-            workspace.upsertSidebarStatusEntry(
+            return workspace.upsertSidebarStatusEntry(
                 key: key,
                 value: value,
                 icon: icon,
@@ -61,7 +61,7 @@ enum ControlSidebarPanelOwner {
             )
         case .dock(let dock):
             guard let panelId else { return .stale }
-            dock.upsertAgentRuntimeStatusEntry(
+            return dock.upsertAgentRuntimeStatusEntry(
                 key: key,
                 value: value,
                 icon: icon,
@@ -74,6 +74,29 @@ enum ControlSidebarPanelOwner {
                 agentEventTime: agentEventTime
             )
         }
+    }
+
+    /// Compatibility bridge for feed attention producers that already own a
+    /// fully formed sidebar row. Keep the mutation on this owner so workspace
+    /// and Dock paths share the same replacement/ordering policy.
+    @discardableResult
+    func setStatusEntry(
+        _ entry: SidebarStatusEntry,
+        key: String,
+        panelId: UUID?
+    ) -> SidebarStatusEntryReplacementDecision {
+        upsertStatusEntry(
+            key: key,
+            value: entry.value,
+            icon: entry.icon,
+            color: entry.color,
+            url: entry.url,
+            priority: entry.priority,
+            format: entry.format,
+            panelId: panelId,
+            pid: nil,
+            agentEventTime: entry.agentEventTime
+        )
     }
 
     func clearStatusEntry(key: String, panelId: UUID?) {
@@ -195,7 +218,7 @@ enum ControlSidebarPanelOwner {
     ) -> Bool {
         switch self {
         case .workspace(let workspace):
-            workspace.acceptAgentRuntimeMutation(
+            return workspace.acceptAgentRuntimeMutation(
                 statusKey: statusKey,
                 panelId: panelId,
                 agentEventTime: agentEventTime,

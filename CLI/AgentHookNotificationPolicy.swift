@@ -35,7 +35,7 @@ enum AgentHookNotifyCategory: String {
         agentKind: String? = nil,
         isSubagent: Bool? = nil
     ) -> String? {
-        guard self != .other else { return nil }
+        guard self != .other || (statusKey != nil && eventTime != nil) else { return nil }
         var segment = "c=\(rawValue);p=\(pending ? 1 : 0)"
         if let agentKind, Self.isValidAgentKindTag(agentKind) {
             segment += ";a=\(agentKind)"

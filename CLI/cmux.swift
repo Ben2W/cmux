@@ -25454,7 +25454,12 @@ struct CMUXCLI {
                 fallbackKind: "claude",
                 cwd: parsedInput.cwd
             )
+            let isForkSessionLaunch = isClaudeForkSessionLaunch(
+                env: ProcessInfo.processInfo.environment,
+                fallbackPID: claudePid
+            )
             let isClearSessionStart = isClaudeClearSessionStart(parsedInput)
+            let sessionStartSource = parsedInput.object?["source"] as? String
             let canReplaceStoppedSession = shouldReplaceStoppedClaudeSession(
                 sessionStore: sessionStore,
                 parsedInput: parsedInput,
@@ -25463,13 +25468,13 @@ struct CMUXCLI {
                 telemetry: telemetry
             )
             let shouldPromoteActiveSession = !isForkSessionLaunch && (isClearSessionStart || canReplaceStoppedSession)
+            var acceptedSessionId: String?
             if let sessionId = parsedInput.sessionId, !isForkSessionLaunch {
                 // Non-clear SessionStart can arrive late from startup/resume/compact
                 // after /clear, so only /clear or replacement of a stopped owner
                 // establishes a new active boundary.
                 let acceptedSessionStart = (try? sessionStore.upsert(
                     sessionId: sessionId,
-                    source: sessionStartSource,
                     workspaceId: workspaceId,
                     surfaceId: surfaceId,
                     cwd: parsedInput.cwd,
@@ -25480,6 +25485,7 @@ struct CMUXCLI {
                     agentLifecycle: shouldPromoteActiveSession ? .running : .unknown,
                     runtimeStatusEventTime: hookEventTime,
                     markActive: shouldPromoteActiveSession,
+                    allowsNewSessionReplacement: sessionStartSource?.lowercased() == "clear",
                     turnId: parsedInput.turnId
                 ))?.accepted == true
                 guard acceptedSessionStart else {
@@ -25487,6 +25493,7 @@ struct CMUXCLI {
                     printClaudeHookAck()
                     return
                 }
+                acceptedSessionId = sessionId
                 if shouldPromoteActiveSession {
                     publishAgentSurfaceResumeBinding(
                         client: client,
@@ -25497,7 +25504,9 @@ struct CMUXCLI {
                         sessionId: sessionId,
                         cwd: parsedInput.cwd,
                         launchCommand: launchCommand,
+                        transcriptPath: parsedInput.transcriptPath,
                         observedPermissionMode: observedHookPermissionMode,
+                        telemetry: telemetry,
                         agentEventTime: hookEventTime
                     )
                 }
@@ -25516,7 +25525,10 @@ struct CMUXCLI {
                 sessionId: acceptedSessionId,
                 cwd: parsedInput.cwd,
                 launchCommand: launchCommand,
-                observedPermissionMode: observedHookPermissionMode
+                transcriptPath: parsedInput.transcriptPath,
+                observedPermissionMode: observedHookPermissionMode,
+                telemetry: telemetry,
+                agentEventTime: hookEventTime
             )
             emitAgentJournalEvent(
                 client: client,
@@ -25719,8 +25731,10 @@ struct CMUXCLI {
                         sessionId: sessionId,
                         cwd: parsedInput.cwd ?? mappedSession?.cwd,
                         launchCommand: mappedSession?.launchCommand,
+                        transcriptPath: parsedInput.transcriptPath ?? mappedSession?.transcriptPath,
                         observedPermissionMode: observedHookPermissionMode
                             ?? mappedSession?.lastPermissionMode,
+                        telemetry: telemetry,
                         agentEventTime: hookEventTime
                     )
                 }
@@ -25913,8 +25927,10 @@ struct CMUXCLI {
                     sessionId: sessionId,
                     cwd: parsedInput.cwd ?? mappedSession?.cwd,
                     launchCommand: mappedSession?.launchCommand ?? firstSightingLaunchCommand,
+                    transcriptPath: parsedInput.transcriptPath ?? mappedSession?.transcriptPath,
                     observedPermissionMode: observedHookPermissionMode
                         ?? mappedSession?.lastPermissionMode,
+                    telemetry: telemetry,
                     agentEventTime: hookEventTime
                 )
             }
@@ -29459,6 +29475,51 @@ struct CMUXCLI {
         return arguments.isEmpty ? nil : arguments
     }
 
+    /// Whether the Claude process this hook fired from was launched with
+    /// `--fork-session`. Fork launches report the parent session id until the
+    /// first prompt, so they must not rebind the parent's hook record.
+    private func isClaudeForkSessionLaunch(env: [String: String], fallbackPID: Int?) -> Bool {
+        guard let arguments = claudeRawLaunchArguments(env: env, fallbackPID: fallbackPID) else {
+            return false
+        }
+        return claudeLaunchArgumentsContainForkSession(arguments)
+    }
+
+    private func claudeLaunchArgumentsContainForkSession(_ arguments: [String]) -> Bool {
+        arguments.contains { argument in
+            if argument == "--fork-session" { return true }
+            guard argument.hasPrefix("--fork-session=") else { return false }
+            let value = argument.dropFirst("--fork-session=".count)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+            return !["false", "0", "no", "off"].contains(value)
+        }
+    }
+
+    /// Returns the parent conversation id for a Claude fork launch, if one was
+    /// supplied as `--resume <id>`/`-r <id>` or `--resume=<id>`.
+    private func claudeForkSessionParentId(env: [String: String], fallbackPID: Int?) -> String? {
+        guard let arguments = claudeRawLaunchArguments(env: env, fallbackPID: fallbackPID),
+              claudeLaunchArgumentsContainForkSession(arguments) else {
+            return nil
+        }
+        for (index, argument) in arguments.enumerated() {
+            if argument == "--resume" || argument == "-r" {
+                guard index + 1 < arguments.count else { return nil }
+                return normalizedHookValue(arguments[index + 1])
+            }
+            if argument.hasPrefix("--resume=") {
+                return normalizedHookValue(String(argument.dropFirst("--resume=".count)))
+            }
+        }
+        return nil
+    }
+
+    private func claudeRawLaunchArguments(env: [String: String], fallbackPID: Int?) -> [String]? {
+        decodeNULSeparatedBase64(env["CMUX_AGENT_LAUNCH_ARGV_B64"])
+            ?? fallbackPID.flatMap { processArguments(for: pid_t($0)) }
+    }
+
     private func agentLaunchCommandFromEnvironment(
         _ env: [String: String],
         fallbackPID: Int?,
@@ -29572,10 +29633,91 @@ struct CMUXCLI {
         sessionId: String,
         cwd: String?,
         launchCommand: AgentHookLaunchCommandRecord?,
+        transcriptPath: String? = nil,
         observedPermissionMode: String? = nil,
+        telemetry: CLISocketSentryTelemetry? = nil,
         agentEventTime: TimeInterval? = nil
     ) {
-        if !agentHookSessionHasDurableResumeEvidence(kind: kind, launchCommand: launchCommand) {
+        if kind == "hermes-agent" {
+            var stateEnvironment = ProcessInfo.processInfo.environment
+            if let launchEnvironment = launchCommand?.environment {
+                stateEnvironment.merge(launchEnvironment) { _, captured in captured }
+            }
+            switch HermesAgentIndex.sessionExistence(
+                sessionID: sessionId,
+                stateDBPath: HermesAgentSessionResolver.stateDBPath(env: stateEnvironment)
+            ) {
+            case .exists:
+                break
+            case .missing:
+                clearAgentSurfaceResumeBinding(
+                    client: client,
+                    workspaceId: workspaceId,
+                    surfaceId: surfaceId,
+                    sessionId: sessionId,
+                    agentEventTime: agentEventTime
+                )
+                return
+            case .unavailable:
+                return
+            }
+        }
+        var codexEvidenceProvenance: AgentResumeEvidenceProvenance?
+        if kind == "codex" {
+            guard agentHookSessionHasDurableResumeEvidence(kind: kind, launchCommand: launchCommand) else {
+                logCodexResumeBindingRejection(
+                    reason: "launch-evidence-rejected",
+                    sessionId: sessionId,
+                    incoming: nil,
+                    existing: nil,
+                    telemetry: telemetry
+                )
+                return
+            }
+            switch codexResumeBindingVerification(
+                sessionId: sessionId,
+                transcriptPath: transcriptPath,
+                launchCommand: launchCommand
+            ) {
+            case .exists(let evidence):
+                guard evidence.provenance.mayOwnBinding else {
+                    logCodexResumeBindingRejection(
+                        reason: "incoming-lower-provenance",
+                        sessionId: evidence.sessionId,
+                        incoming: evidence.provenance,
+                        existing: nil,
+                        telemetry: telemetry
+                    )
+                    return
+                }
+                codexEvidenceProvenance = evidence.provenance
+            case .missing:
+                logCodexResumeBindingRejection(
+                    reason: "rollout-missing",
+                    sessionId: sessionId,
+                    incoming: nil,
+                    existing: nil,
+                    telemetry: telemetry
+                )
+                clearAgentSurfaceResumeBinding(
+                    client: client,
+                    workspaceId: workspaceId,
+                    surfaceId: surfaceId,
+                    sessionId: sessionId,
+                    agentEventTime: agentEventTime
+                )
+                return
+            case .unavailable:
+                logCodexResumeBindingRejection(
+                    reason: "rollout-store-unavailable",
+                    sessionId: sessionId,
+                    incoming: nil,
+                    existing: nil,
+                    telemetry: telemetry
+                )
+                return
+            }
+        } else if !agentHookSessionHasDurableResumeEvidence(kind: kind, launchCommand: launchCommand) {
             clearAgentSurfaceResumeBinding(
                 client: client,
                 workspaceId: workspaceId,
@@ -32193,6 +32335,8 @@ export default CMUXSessionRestore;
                         sessionId: sessionId,
                         cwd: preferredAgentHookResumeWorkingDirectory(kind: def.name, current: launchCommand, currentCwd: hookCwd, mapped: mapped),
                         launchCommand: resumeLaunchCommand,
+                        transcriptPath: input.transcriptPath ?? mapped?.transcriptPath,
+                        telemetry: telemetry,
                         agentEventTime: hookEventTime
                     )
                 }
@@ -32286,6 +32430,8 @@ export default CMUXSessionRestore;
                     sessionId: sessionId,
                     cwd: latest.cwd,
                     launchCommand: latest.launchCommand,
+                    transcriptPath: latest.transcriptPath,
+                    telemetry: telemetry,
                     agentEventTime: latestEventTime
                 )
                 // A stale prompt-submit may have journaled a spurious
@@ -32515,6 +32661,8 @@ export default CMUXSessionRestore;
                     sessionId: sessionId,
                     cwd: preferredAgentHookResumeWorkingDirectory(kind: def.name, current: launchCommand, currentCwd: hookCwd, mapped: mapped),
                     launchCommand: resumeLaunchCommand,
+                    transcriptPath: input.transcriptPath ?? mapped?.transcriptPath,
+                    telemetry: telemetry,
                     agentEventTime: hookEventTime
                 )
                 if codexPromptTurnWentTerminal() {
@@ -32846,6 +32994,8 @@ export default CMUXSessionRestore;
                     sessionId: sessionId,
                     cwd: cwd,
                     launchCommand: resumeLaunchCommand,
+                    transcriptPath: transcriptPathForStore,
+                    telemetry: telemetry,
                     agentEventTime: hookEventTime
                 )
             }
@@ -33078,6 +33228,8 @@ export default CMUXSessionRestore;
                     sessionId: sessionId,
                     cwd: preferredAgentHookResumeWorkingDirectory(kind: def.name, current: launchCommand, currentCwd: hookCwd, mapped: mapped),
                     launchCommand: resumeLaunchCommand,
+                    transcriptPath: input.transcriptPath ?? mapped?.transcriptPath,
+                    telemetry: telemetry,
                     agentEventTime: hookEventTime
                 )
             }
