@@ -100,6 +100,11 @@ extension Workspace {
                 statusEntriesForPanel[statusKey] = statusEntry
             }
         }
+        for (statusKey, lifecycle) in lifecycleStates where lifecycle == .needsInput {
+            if let statusEntry = statusEntries[statusKey] {
+                statusEntriesForPanel[statusKey] = statusEntry
+            }
+        }
         guard !statusEntriesForPanel.isEmpty
                 || !agentPIDsForPanel.isEmpty
                 || !pidKeys.isEmpty
@@ -133,6 +138,11 @@ extension Workspace {
             return true
         }
         for key in agentPIDPanelIdsByKey.keys where agentStatusKey(forAgentPIDKey: key) == statusKey {
+            return true
+        }
+        if agentLifecycleStatesByPanelId.values.contains(where: {
+            $0[statusKey] == .needsInput
+        }) {
             return true
         }
         return false
@@ -316,9 +326,7 @@ extension Workspace {
 
     /// Clears a panel's restored agent snapshot and resume metadata.
     func clearRestoredAgentSnapshot(panelId: UUID) {
-        restoredAgentSnapshotsByPanelId.removeValue(forKey: panelId)
-        restoredAgentResumeStatesByPanelId.removeValue(forKey: panelId)
-        restoredResumeSessionWorkingDirectoriesByPanelId.removeValue(forKey: panelId)
+        restoredAgentLifecycle.clearSessionRestore(panelId: panelId)
     }
 
     func refreshTrackedAgentPorts() {
@@ -422,11 +430,19 @@ extension Workspace {
         removePendingTerminalInputObservers(forPanelId: panelId)
         let transferredRemoteCleanupConfiguration = transferredRemoteCleanupConfigurationsByPanelId.removeValue(forKey: panelId)
         panelSubscriptions.removeValue(forKey: panelId)?.cancel()
+        (panel as? FilePreviewPanel)?.unbindTabMetadata()
         discardAgentSessionPanelSubscription(panelId: panelId, panel: panel)
         discardBrowserPanelSubscription(panelId: panelId, panel: panel)
         removeBrowserOpenTabSuggestionIfNeeded(panel: panel, panelId: panelId)
         if cleanupControllerSurfaceState {
-            TerminalController.shared.cleanupSurfaceState(surfaceIds: [panelId, tabId?.uuid].compactMap { $0 })
+            TerminalController.shared.cleanupSurfaceState(
+                surfaceIds: [panelId, tabId?.uuid].compactMap { $0 }
+            )
+        }
+        if !preservesTerminalForTransfer {
+            terminalStartupRestoreCoordinator.discardPendingRestoreForPanelTeardown(
+                panelID: panelId
+            )
         }
         if closePanel {
             panel?.close()

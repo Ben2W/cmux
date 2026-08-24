@@ -43,7 +43,26 @@ enum AgentHookNotifyCategory: String {
             return "c=\(rawValue);p=\(pending ? 1 : 0);k=\(statusKey);t=\(eventTimeText)"
         }
         guard self != .other else { return nil }
-        return "c=\(rawValue);p=\(pending ? 1 : 0)"
+        var segment = "c=\(rawValue);p=\(pending ? 1 : 0)"
+        if let agentKind, Self.isValidAgentKindTag(agentKind) {
+            segment += ";a=\(agentKind)"
+        }
+        if let isSubagent {
+            segment += ";n=\(isSubagent ? 1 : 0)"
+        }
+        return segment
+    }
+
+    /// Mirror of the app-side `AgentNotificationMeta` slug grammar: 1-64
+    /// characters of `[a-z0-9._-]`. Both sides must agree exactly or the app
+    /// folds the meta back into the notification body.
+    static func isValidAgentKindTag(_ value: String) -> Bool {
+        guard !value.isEmpty, value.count <= 64 else { return false }
+        return value.allSatisfy { character in
+            character.isASCII
+                && (character.isLowercase || character.isNumber
+                    || character == "." || character == "_" || character == "-")
+        }
     }
 }
 
@@ -127,14 +146,15 @@ enum AgentHookNotificationClassifier {
                 notifyCategory: .idleReminder
             )
         }
-        let body = String.localizedStringWithFormat(
-            String(localized: "agent.generic.notification.body.needsAttention", defaultValue: "%@ needs your attention"),
-            displayName
-        )
+        // No usable message and no matching cue: nothing is fabricated. The
+        // empty body tells callers to reuse a stored summary or skip the
+        // banner, and the nil status makes no lifecycle claim — the old
+        // "%@ needs your attention" needs-input fallback is deliberately
+        // gone (semantic journal events carry state now).
         return AgentHookNotificationSummary(
             subtitle: String(localized: "agent.generic.notification.subtitle.attention", defaultValue: "Attention"),
-            body: body,
-            status: .needsInput,
+            body: "",
+            status: nil,
             isFallback: true,
             notifyCategory: .idleReminder
         )
@@ -212,7 +232,7 @@ enum AgentHookNotificationClassifier {
 }
 
 enum AgentHookNotificationPolicy {
-    static let dedupeEligibleAgents: Set<String> = ["grok", "antigravity"]
+    static let dedupeEligibleAgents: Set<String> = ["grok", "antigravity", "hermes-agent"]
 
     static func notificationTitle(
         agentName: String,
