@@ -391,6 +391,34 @@ def expect_fail_closed_timestamped_hook(
         cursor = index + len(fragment)
 
 
+def expect_exit_preserving_timestamped_hook(
+    command: str,
+    context: str,
+    failures: list[str],
+) -> None:
+    """Decision hooks must execute even when the ordering clock is unavailable."""
+    missing_clock = (
+        'if [ -z "$hook_captured_at" ]; then'
+        if 'if [ -z "$hook_captured_at" ]; then' in command
+        else 'if [ -n "$hook_captured_at" ]; then'
+    )
+    expect(
+        missing_clock in command,
+        f"{context} hook should check for an unavailable ordering clock, got {command!r}",
+        failures,
+    )
+    expect(
+        'printf "{}' not in command and "exit 0; fi" not in command,
+        f"{context} hook must not turn a missing clock into an implicit allow, got {command!r}",
+        failures,
+    )
+    expect(
+        '"${CMUX_CLAUDE_HOOK_CMUX_BIN:-cmux}" hooks feed --source claude' in command,
+        f"{context} hook should preserve the decision command on the no-clock path, got {command!r}",
+        failures,
+    )
+
+
 def decode_nul_argv(encoded: str) -> list[str]:
     raw = base64.b64decode(encoded)
     parts = raw.split(b"\0")
@@ -580,9 +608,16 @@ def test_live_socket_injects_supported_hooks_without_unlocking_bypass(failures: 
     for hook_name, groups in hooks.items():
         for group_index, group in enumerate(groups):
             for hook_index, hook in enumerate(group.get("hooks", [])):
-                expect_fail_closed_timestamped_hook(
-                    hook.get("command", ""),
-                    f"{hook_name}[{group_index}].hooks[{hook_index}]",
+                command = hook.get("command", "")
+                context = f"{hook_name}[{group_index}].hooks[{hook_index}]"
+                if hook_name == "PermissionRequest":
+                    expect_exit_preserving_timestamped_hook(command, context, failures)
+                else:
+                    expect_fail_closed_timestamped_hook(command, context, failures)
+                expect(
+                    '[ "$fraction" -ge 0 ]' not in command
+                    and '[ "$state_fraction" -ge 0 ]' not in command,
+                    f"{context} hook must not parse zero-padded fractions as octal, got {command!r}",
                     failures,
                 )
     for hook_name, expected_subcommand in {
