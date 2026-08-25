@@ -23,8 +23,14 @@ struct AgentRuntimeMutationOrdering {
                 retainedEventTime: nil
             )
         }
+        guard let agentEventTime else {
+            return AgentRuntimeMutationOrderingDecision(
+                isAccepted: false,
+                retainedEventTime: nil
+            )
+        }
         if let replacementWatermark {
-            guard let agentEventTime, agentEventTime > replacementWatermark else {
+            guard agentEventTime > replacementWatermark else {
                 return AgentRuntimeMutationOrderingDecision(
                     isAccepted: false,
                     retainedEventTime: nil
@@ -34,7 +40,7 @@ struct AgentRuntimeMutationOrdering {
         if let orderingWatermark = [lifecycleEventTime, statusEventTime]
             .compactMap({ $0 })
             .max() {
-            guard let agentEventTime, agentEventTime >= orderingWatermark else {
+            guard agentEventTime >= orderingWatermark else {
                 return AgentRuntimeMutationOrderingDecision(
                     isAccepted: false,
                     retainedEventTime: nil

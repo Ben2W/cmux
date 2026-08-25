@@ -210,6 +210,9 @@ extension DockSplitStore {
         let orderingWatermark = [surfaceResumeBindingEventTimesByPanelId[panelId], currentBindingTime]
             .compactMap { $0 }
             .max()
+        if requiresAgentEventTime, agentEventTime == nil {
+            return false
+        }
         guard let orderingWatermark else { return true }
         guard let agentEventTime else { return !requiresAgentEventTime }
         return agentEventTime >= orderingWatermark
