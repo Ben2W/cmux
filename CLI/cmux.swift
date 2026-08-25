@@ -25476,7 +25476,10 @@ struct CMUXCLI {
                 surfaceId: resolvedSurface.isAuthoritative ? surfaceId : nil,
                 telemetry: telemetry
             )
-            let shouldPromoteActiveSession = !isForkParentSessionStart && (isClearSessionStart || canReplaceStoppedSession)
+            let isForkChildSessionStart = isForkSessionLaunch && !isForkParentSessionStart
+            let shouldPromoteActiveSession = !isForkParentSessionStart && (
+                isClearSessionStart || canReplaceStoppedSession || isForkChildSessionStart
+            )
             var acceptedSessionId: String?
             if let sessionId = parsedInput.sessionId, !isForkParentSessionStart {
                 // Non-clear SessionStart can arrive late from startup/resume/compact
@@ -25522,6 +25525,11 @@ struct CMUXCLI {
             }
             guard let acceptedSessionId else {
                 telemetry.breadcrumb("claude-hook.session-start.stale")
+                printClaudeHookAck()
+                return
+            }
+            guard shouldPromoteActiveSession else {
+                telemetry.breadcrumb("claude-hook.session-start.non-promoted")
                 printClaudeHookAck()
                 return
             }
