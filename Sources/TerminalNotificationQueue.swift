@@ -140,6 +140,12 @@ final class TerminalMutationBus: @unchecked Sendable {
         currentNotificationGeneration &+= 1
         var coalescedEventTime = agentEventTime
         pending.removeAll { entry in
+            if case .deliverNotification(let notification) = entry.mutation,
+               notification.key.surfaceId == surfaceId,
+               notification.agentStatusKey == statusKey,
+               notification.agentEventTime == nil || notification.agentEventTime! <= agentEventTime {
+                return true
+            }
             guard case .clearAgentNotifications(
                 claimedTabId: _,
                 surfaceId: let queuedSurfaceId,

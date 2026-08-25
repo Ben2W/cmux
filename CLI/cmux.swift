@@ -1020,6 +1020,7 @@ final class ClaudeHookSessionStore {
         }
     }
 
+    @discardableResult
     func markNotificationResolved(
         sessionId: String,
         workspaceId: String,
@@ -1031,10 +1032,10 @@ final class ClaudeHookSessionStore {
         agentLifecycle: AgentHibernationLifecycleState? = nil,
         runtimeStatus: AgentHookRuntimeStatus? = nil,
         runtimeStatusEventTime: TimeInterval? = nil
-    ) throws {
+    ) throws -> Bool {
         let normalized = normalizeSessionId(sessionId)
-        guard !normalized.isEmpty else { return }
-        try withLockedState { state in
+        guard !normalized.isEmpty else { return false }
+        return try withLockedState { state in
             let now = Date().timeIntervalSince1970
             var record = makeSessionRecord(
                 state: state,
@@ -1062,12 +1063,13 @@ final class ClaudeHookSessionStore {
                 runtimeStatusEventTime: runtimeStatusEventTime,
                 now: now
             ) else {
-                return
+                return false
             }
             record.lastSubtitle = nil
             record.lastBody = nil
             record.lastNotificationStatus = nil
             state.sessions[normalized] = record
+            return true
         }
     }
 
@@ -33336,7 +33338,7 @@ export default CMUXSessionRestore;
             )
             let suppressVisibleMutations = shouldSuppressNestedAgentVisibleMutations(currentAgentPID: pid, env: env)
             if !sessionId.isEmpty, !suppressVisibleMutations {
-                try? store.markNotificationResolved(
+                let acceptedResolution = (try? store.markNotificationResolved(
                     sessionId: sessionId,
                     workspaceId: workspaceId,
                     surfaceId: surfaceId,
@@ -33347,7 +33349,13 @@ export default CMUXSessionRestore;
                     agentLifecycle: .running,
                     runtimeStatus: .running,
                     runtimeStatusEventTime: hookEventTime
-                )
+                )) == true
+                guard acceptedResolution else {
+                    telemetry.breadcrumb("\(def.name)-hook.approval-response.stale-event")
+                    didSendFeedTelemetry = true
+                    print("{}")
+                    return
+                }
                 publishAgentSurfaceResumeBinding(
                     client: client,
                     workspaceId: workspaceId,
