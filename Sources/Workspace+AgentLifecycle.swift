@@ -1,5 +1,6 @@
 import CmuxSidebar
 import CmuxWorkspaces
+import CMUXAgentLaunch
 import Foundation
 
 extension Workspace {
@@ -339,7 +340,6 @@ extension Workspace {
         agentEventTime: TimeInterval?
     ) -> SidebarStatusEntryReplacementDecision {
         let ownerPanelId = panelId
-        let isStructuredAgentStatus = AgentHibernationLifecycleStatusKeys.allowedStatusKeys.contains(key)
         let hasLifecycleWatermark = ownerPanelId.flatMap {
             agentLifecycleEventTimesByPanelId[$0]?[key]
         } != nil
@@ -348,7 +348,7 @@ extension Workspace {
                statusKey: key,
                panelId: ownerPanelId,
                agentEventTime: agentEventTime,
-               enforceOrdering: agentEventTime != nil || hasLifecycleWatermark || isStructuredAgentStatus
+               enforceOrdering: agentEventTime != nil || hasLifecycleWatermark
            ) {
             return .stale
         }

@@ -33085,7 +33085,8 @@ export default CMUXSessionRestore;
             // Commit the journal boundary only after the ordered store mutation
             // accepted this event. A stale detached Stop must not outrank a
             // newer running event in the append-only lifecycle stream.
-            if !staleIdleStopHasNewerRunningSession {
+            let stopJournalAccepted = sessionId.isEmpty || promptStopResult?.accepted == true
+            if stopJournalAccepted && !staleIdleStopHasNewerRunningSession {
                 emitJournal(
                     stopHadFailure ? .errorReported : .turnCompleted,
                     workspaceId: workspaceId,

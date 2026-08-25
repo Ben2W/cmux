@@ -276,12 +276,11 @@ extension DockSplitStore {
     ) -> SidebarStatusEntryReplacementDecision {
         var replacementDecision: SidebarStatusEntryReplacementDecision = .stale
         mutateAgentRuntime(panelId: panelId, updatesAgentAttention: true) { runtime in
-            let isStructuredAgentStatus = AgentHibernationLifecycleStatusKeys.allowedStatusKeys.contains(key)
             let hasLifecycleWatermark = runtime.agentLifecycleEventTimes[key] != nil
             guard Self.acceptAgentRuntimeMutation(
                 statusKey: key,
                 agentEventTime: agentEventTime,
-                enforceOrdering: agentEventTime != nil || hasLifecycleWatermark || isStructuredAgentStatus,
+                enforceOrdering: agentEventTime != nil || hasLifecycleWatermark,
                 runtime: &runtime
             ) else {
                 return

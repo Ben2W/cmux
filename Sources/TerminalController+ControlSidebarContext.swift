@@ -70,7 +70,7 @@ extension TerminalController: ControlSidebarContext {
                 pid: pid,
                 panelId: panelID,
                 agentEventTime: agentEventTime,
-                enforceAgentEventOrdering: true
+                enforceAgentEventOrdering: agentEventTime != nil
             )
             if didReplaceAgentRuntime, let panelID {
                 TerminalNotificationStore.shared.clearNotifications(
@@ -144,7 +144,7 @@ extension TerminalController: ControlSidebarContext {
                 panelId: panelID,
                 lifecycle: lifecycle,
                 agentEventTime: agentEventTime,
-                enforceAgentEventOrdering: true
+                enforceAgentEventOrdering: agentEventTime != nil
             )
         }
     }
@@ -214,7 +214,7 @@ extension TerminalController: ControlSidebarContext {
                 clearStatus: clearStatus,
                 requireOwnedKey: requireOwnedKey,
                 agentEventTime: agentEventTime,
-                enforceAgentEventOrdering: true
+                enforceAgentEventOrdering: agentEventTime != nil
             )
         }
     }
