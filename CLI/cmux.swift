@@ -1646,6 +1646,16 @@ final class ClaudeHookSessionStore {
         }
     }
 
+    func hasActiveSession(workspaceId: String, surfaceId: String?) throws -> Bool {
+        guard let normalizedWorkspace = normalizeOptional(workspaceId) else { return false }
+        return try withLockedState { state in
+            if let normalizedSurface = normalizeOptional(surfaceId) {
+                return state.activeSessionsBySurface[normalizedSurface] != nil
+            }
+            return state.activeSessionsByWorkspace[normalizedWorkspace] != nil
+        }
+    }
+
     func consume(
         sessionId: String?,
         workspaceId: String?,
@@ -25476,9 +25486,13 @@ struct CMUXCLI {
                 surfaceId: resolvedSurface.isAuthoritative ? surfaceId : nil,
                 telemetry: telemetry
             )
+            let hasActiveSession = (try? sessionStore.hasActiveSession(
+                workspaceId: workspaceId,
+                surfaceId: resolvedSurface.isAuthoritative ? surfaceId : nil
+            )) == true
             let isForkChildSessionStart = isForkSessionLaunch && !isForkParentSessionStart
             let shouldPromoteActiveSession = !isForkParentSessionStart && (
-                isClearSessionStart || canReplaceStoppedSession || isForkChildSessionStart
+                isClearSessionStart || canReplaceStoppedSession || isForkChildSessionStart || !hasActiveSession
             )
             var acceptedSessionId: String?
             if let sessionId = parsedInput.sessionId, !isForkParentSessionStart {
@@ -31965,10 +31979,11 @@ export default CMUXSessionRestore;
         // Destructive session teardown shared by a genuine (non-turn-boundary)
         // `session-end` and the dedicated `session-finalize` action: consume the
         // restore record, clear the surface resume binding, and clear PID routing.
-        func performAgentSessionTeardown() {
-            guard let mapped = sessionId.isEmpty ? nil : (try? store.lookup(sessionId: sessionId)) else { return }
+        func performAgentSessionTeardown() -> Bool {
+            guard let mapped = sessionId.isEmpty ? nil : (try? store.lookup(sessionId: sessionId)) else { return false }
             sendAgentFeedTelemetry(workspaceId: mapped.workspaceId)
             let suppressVisibleMutations = shouldSuppressNestedAgentVisibleMutations(currentAgentPID: mapped.pid, env: env)
+            var didConsumeSession = false
             if suppressVisibleMutations {
                 telemetry.breadcrumb("\(def.name)-hook.session-end.nested-suppressed")
             } else if let consumed = try? store.consume(
@@ -31977,6 +31992,7 @@ export default CMUXSessionRestore;
                 surfaceId: nil,
                 eventTime: hookEventTime
             ) {
+                didConsumeSession = true
                 if !clearAgentSurfaceResumeBinding(
                     client: client,
                     workspaceId: consumed.workspaceId,
@@ -31992,6 +32008,7 @@ export default CMUXSessionRestore;
                     client: client
                 )
             }
+            return didConsumeSession
         }
         func runtimeStatus(for notificationStatus: AgentHookNotificationStatus?) -> AgentHookRuntimeStatus? {
             switch notificationStatus {
@@ -33771,17 +33788,7 @@ export default CMUXSessionRestore;
             }
             if def.sessionEndIsTurnBoundary {
                 if let mapped = sessionId.isEmpty ? nil : (try? store.lookup(sessionId: sessionId)) {
-                    // These providers use session-end as their per-turn
-                    // boundary (the cmux-tui mapping table's antigravity /
-                    // hermes special case), so it journals as a completed
-                    // turn, not a session teardown.
-                    emitJournal(
-                        .turnCompleted,
-                        workspaceId: mapped.workspaceId,
-                        surfaceId: mapped.surfaceId
-                    )
-                    sendAgentFeedTelemetry(workspaceId: mapped.workspaceId, surfaceId: mapped.surfaceId)
-                    _ = try? store.recordPromptStop(
+                    let promptStopResult = try? store.recordPromptStop(
                         sessionId: sessionId,
                         workspaceId: mapped.workspaceId,
                         surfaceId: mapped.surfaceId,
@@ -33799,6 +33806,20 @@ export default CMUXSessionRestore;
                             workspaceId: mapped.workspaceId
                         )
                     )
+                    guard promptStopResult?.accepted == true else {
+                        telemetry.breadcrumb("(def.name)-hook.session-end.stale-event")
+                        break
+                    }
+                    // These providers use session-end as their per-turn
+                    // boundary (the cmux-tui mapping table's antigravity /
+                    // hermes special case), so it journals as a completed
+                    // turn, not a session teardown.
+                    emitJournal(
+                        .turnCompleted,
+                        workspaceId: mapped.workspaceId,
+                        surfaceId: mapped.surfaceId
+                    )
+                    sendAgentFeedTelemetry(workspaceId: mapped.workspaceId, surfaceId: mapped.surfaceId)
                 }
 #if DEBUG
                 agentHookDebugLog(
@@ -33810,20 +33831,20 @@ export default CMUXSessionRestore;
                 break
             }
             // A non-turn-boundary session-end is a genuine teardown.
-            if let ending = sessionId.isEmpty ? nil : (try? store.lookup(sessionId: sessionId)) {
+            let ending = sessionId.isEmpty ? nil : (try? store.lookup(sessionId: sessionId))
+            if performAgentSessionTeardown(), let ending {
                 emitJournal(.sessionEnded, workspaceId: ending.workspaceId, surfaceId: ending.surfaceId)
-            } else {
+            } else if ending == nil {
                 emitJournal(.sessionEnded, workspaceId: nil, surfaceId: nil, unattributedReason: "session-unknown")
             }
-            performAgentSessionTeardown()
 
         case .sessionFinalize:
-            if let ending = sessionId.isEmpty ? nil : (try? store.lookup(sessionId: sessionId)) {
+            let ending = sessionId.isEmpty ? nil : (try? store.lookup(sessionId: sessionId))
+            if performAgentSessionTeardown(), let ending {
                 emitJournal(.sessionEnded, workspaceId: ending.workspaceId, surfaceId: ending.surfaceId)
-            } else {
+            } else if ending == nil {
                 emitJournal(.sessionEnded, workspaceId: nil, surfaceId: nil, unattributedReason: "session-unknown")
             }
-            performAgentSessionTeardown()
 
         case .noop:
             break
