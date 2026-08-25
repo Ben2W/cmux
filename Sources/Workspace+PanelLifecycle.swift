@@ -101,7 +101,8 @@ extension Workspace {
             }
         }
         for (statusKey, lifecycle) in lifecycleStates where lifecycle == .needsInput {
-            if let statusEntry = statusEntries[statusKey] {
+            if let statusEntry = statusEntries[statusKey],
+               statusEntry.agentOwnerPanelID == nil || statusEntry.agentOwnerPanelID == panelId {
                 statusEntriesForPanel[statusKey] = statusEntry
             }
         }

@@ -25755,8 +25755,7 @@ struct CMUXCLI {
                     agentKey: Self.claudeCodeStatusKey,
                     sessionId: parsedInput.sessionId,
                     workspaceId: workspaceId,
-                    surfaceId: surfaceId,
-                    agentEventTime: hookEventTime
+                    surfaceId: surfaceId
                 )
                 if hasPendingBackgroundWork {
                     // The turn ended but a background task or scheduled wakeup is
@@ -32438,11 +32437,10 @@ export default CMUXSessionRestore;
                     client: client
                 )
             }
-            emitJournal(
-                .sessionStarted,
-                workspaceId: workspaceId,
-                surfaceId: surfaceId,
-                agentEventTime: hookEventTime
+                emitJournal(
+                    .sessionStarted,
+                    workspaceId: workspaceId,
+                    surfaceId: surfaceId
             )
             if !suppressVisibleMutations {
                 if let owner = try? store.lookup(sessionId: sessionId) {
@@ -32542,8 +32540,7 @@ export default CMUXSessionRestore;
                     emitJournal(
                         .stateChanged,
                         workspaceId: workspaceId,
-                        surfaceId: surfaceId,
-                        agentEventTime: latestEventTime
+                        surfaceId: surfaceId
                     )
                 }
                 switch latest.runtimeStatus {
