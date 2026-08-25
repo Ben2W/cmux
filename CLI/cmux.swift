@@ -28664,6 +28664,11 @@ struct CMUXCLI {
                     excluding: publishedUserInputCallIds
                 ) {
                     guard let eventTime = sampleAgentHookEventTime() else {
+                        waitForCodexTranscriptChange(
+                            path: currentTranscriptPath,
+                            leasePath: leasePath,
+                            timeout: 1
+                        )
                         continue
                     }
                     publishedUserInputCallIds.insert(userInput.callId)
@@ -29631,8 +29636,22 @@ struct CMUXCLI {
     }
 
     private func claudeRawLaunchArguments(env: [String: String], fallbackPID: Int?) -> [String]? {
-        decodeNULSeparatedBase64(env["CMUX_AGENT_LAUNCH_ARGV_B64"])
-            ?? fallbackPID.flatMap { processArguments(for: pid_t($0)) }
+        if let captured = decodeNULSeparatedBase64(env["CMUX_AGENT_LAUNCH_ARGV_B64"]) {
+            return captured
+        }
+        guard let fallbackPID else { return nil }
+        let pid = pid_t(fallbackPID)
+        let candidate = processArguments(for: pid)
+        guard AgentLaunchCaptureTrust.nativeProcessDescribesKind(
+            processName: processName(for: pid),
+            arguments: candidate,
+            kind: "claude"
+        ),
+        let candidate,
+        !AgentLaunchCaptureTrust.argvLooksLikeShellWrapper(candidate) else {
+            return nil
+        }
+        return candidate
     }
 
     private func agentLaunchCommandFromEnvironment(
