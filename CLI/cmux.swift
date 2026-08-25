@@ -28663,12 +28663,15 @@ struct CMUXCLI {
                     turnId: turnId,
                     excluding: publishedUserInputCallIds
                 ) {
+                    guard let eventTime = sampleAgentHookEventTime() else {
+                        continue
+                    }
                     publishedUserInputCallIds.insert(userInput.callId)
                     publishCodexMonitorUserInput(
                         userInput,
                         workspaceId: workspaceId,
                         surfaceId: surfaceId,
-                        agentEventTime: sampleAgentHookEventTime(),
+                        agentEventTime: eventTime,
                         client: client
                     )
                 }
@@ -28679,11 +28682,14 @@ struct CMUXCLI {
                     requireTerminalCompletion: true
                 ) {
                 case .failure(let failure):
+                    guard let eventTime = sampleAgentHookEventTime() else {
+                        return
+                    }
                     publishCodexMonitorFailure(
                         failure,
                         workspaceId: workspaceId,
                         surfaceId: surfaceId,
-                        agentEventTime: sampleAgentHookEventTime(),
+                        agentEventTime: eventTime,
                         client: client
                     )
                     return

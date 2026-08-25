@@ -5306,9 +5306,10 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
                 // The SSH child has exited and the pane is back at its local
                 // shell.  Retaining this binding would relaunch a connection
                 // the user has intentionally left.
-                surfaceResumeBindingsByPanelId.removeValue(forKey: panelId)
-                observedPlainSSHPanelIds.remove(panelId)
-                plainSSHDetectionMissesByPanelId.removeValue(forKey: panelId)
+                _ = clearSurfaceResumeBinding(
+                    panelId: panelId,
+                    eventTime: Date.now.timeIntervalSince1970
+                )
             default:
                 break
             }
@@ -10198,6 +10199,9 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             surfaceTTYNames.removeValue(forKey: detached.panelId)
             surfaceResumeBindingsByPanelId.removeValue(forKey: detached.panelId)
             surfaceResumeBindingEventTimesByPanelId.removeValue(forKey: detached.panelId)
+            pendingPlainSSHRestorePanelIds.remove(detached.panelId)
+            observedPlainSSHPanelIds.remove(detached.panelId)
+            plainSSHDetectionMissesByPanelId.removeValue(forKey: detached.panelId)
             restoredResumeSessionWorkingDirectoriesByPanelId.removeValue(forKey: detached.panelId)
             syncRemotePortScanTTYs()
             panelTitles.removeValue(forKey: detached.panelId)

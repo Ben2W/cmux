@@ -200,16 +200,16 @@ extension DockSplitStore {
             binding.isAgentHookBinding else {
             return
         }
-        recordSurfaceResumeBindingMutation(
-            panelId: panelId,
-            eventTime: Date.now.timeIntervalSince1970
-        )
         if let restoredAgent {
             let checkpointId = binding.checkpointId?.trimmingCharacters(in: .whitespacesAndNewlines)
             guard checkpointId == nil || checkpointId == restoredAgent.sessionId else {
                 return
             }
         }
+        recordSurfaceResumeBindingMutation(
+            panelId: panelId,
+            eventTime: Date.now.timeIntervalSince1970
+        )
         let originalBinding = binding
         binding.autoResume = false
         if binding.hasCompleteManagedSessionIdentity {

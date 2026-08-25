@@ -132,7 +132,12 @@ extension Workspace {
         enforceOrdering: Bool,
         isLifecycleMutation: Bool = false
     ) -> Bool {
-        guard enforceOrdering, let panelId else { return true }
+        guard enforceOrdering else { return true }
+        guard let panelId else {
+            // Ordered agent events are pane-scoped; accepting a timestamped
+            // mutation without a panel would let it bypass every watermark.
+            return agentEventTime == nil
+        }
         let lifecycleEventTime = agentLifecycleEventTimesByPanelId[panelId]?[statusKey]
         let statusEventTime = statusEntries[statusKey].flatMap { entry in
             entry.agentOwnerPanelID == nil || entry.agentOwnerPanelID == panelId
