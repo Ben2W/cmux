@@ -1656,6 +1656,21 @@ final class ClaudeHookSessionStore {
         }
     }
 
+    func isActiveSession(
+        sessionId: String?,
+        workspaceId: String,
+        surfaceId: String?
+    ) throws -> Bool {
+        guard let normalizedSessionId = normalizeOptional(sessionId),
+              let normalizedWorkspace = normalizeOptional(workspaceId) else { return false }
+        return try withLockedState { state in
+            if let normalizedSurface = normalizeOptional(surfaceId) {
+                return state.activeSessionsBySurface[normalizedSurface]?.sessionId == normalizedSessionId
+            }
+            return state.activeSessionsByWorkspace[normalizedWorkspace]?.sessionId == normalizedSessionId
+        }
+    }
+
     func consume(
         sessionId: String?,
         workspaceId: String?,
@@ -25490,9 +25505,15 @@ struct CMUXCLI {
                 workspaceId: workspaceId,
                 surfaceId: resolvedSurface.isAuthoritative ? surfaceId : nil
             )) == true
+            let isSameActiveSession = (try? sessionStore.isActiveSession(
+                sessionId: parsedInput.sessionId,
+                workspaceId: workspaceId,
+                surfaceId: resolvedSurface.isAuthoritative ? surfaceId : nil
+            )) == true
             let isForkChildSessionStart = isForkSessionLaunch && !isForkParentSessionStart
             let shouldPromoteActiveSession = !isForkParentSessionStart && (
-                isClearSessionStart || canReplaceStoppedSession || isForkChildSessionStart || !hasActiveSession
+                isClearSessionStart || canReplaceStoppedSession || isForkChildSessionStart
+                    || !hasActiveSession || isSameActiveSession
             )
             var acceptedSessionId: String?
             if let sessionId = parsedInput.sessionId, !isForkParentSessionStart {
