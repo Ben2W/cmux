@@ -1037,6 +1037,22 @@ cmux_claude_wrapper_create_settings_values_file() {
     printf '%s' "$settings_path"
 }
 
+# Settings files are passed to Claude through an exec'd process, so the wrapper
+# cannot use an EXIT trap after handing off. Keep a tiny detached reaper tied to
+# this launch PID; it removes every private settings artifact once Claude exits
+# (or after a crash), preventing /tmp growth and retaining user settings only
+# for the lifetime of the launch that needs them.
+cmux_claude_wrapper_schedule_settings_cleanup() {
+    local owner_pid="$$"
+    local path
+    local -a paths=("$@")
+    (while /bin/kill -0 "$owner_pid" 2>/dev/null; do /bin/sleep 1; done
+     /bin/sleep 2
+     for path in "${paths[@]}"; do
+         [[ -n "$path" ]] && rm -f -- "$path"
+     done) >/dev/null 2>&1 &
+}
+
 claude_interactive_entry_flag() {
     case "$1" in
         --print|--print=*|-p|--resume|--resume=*|-r|--continue|-c|\
@@ -1411,6 +1427,11 @@ if [[ -n "$CMUX_SETTINGS_BASE_PATH" && "$CMUX_SETTINGS_PATH" != "$CMUX_SETTINGS_
     rm -f -- "$CMUX_SETTINGS_BASE_PATH"
 fi
 unset CMUX_MERGED_SETTINGS_PATH cmux_merge_status CMUX_SETTINGS_INPUTS_PATH
+
+if [[ -n "$CMUX_SETTINGS_PATH" ]]; then
+    cmux_claude_wrapper_schedule_settings_cleanup \
+        "$CMUX_SETTINGS_PATH" "$CMUX_SETTINGS_BASE_PATH" "$CMUX_MERGED_SETTINGS_PATH"
+fi
 
 # Capture only the compact post-merge argv. The previous implementation encoded
 # the inline JSON here as a second ARG_MAX multiplier.

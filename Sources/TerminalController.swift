@@ -13033,7 +13033,9 @@ class TerminalController {
             category: meta?.category,
             pending: meta?.pending ?? false,
             agentStatusKey: meta?.agentStatusKey,
-            agentEventTime: meta?.agentEventTime
+            agentEventTime: meta?.agentEventTime,
+            agentKind: meta?.agentKind,
+            isSubagent: meta?.isSubagent
         ) else {
 #if DEBUG
             if let meta {

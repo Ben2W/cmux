@@ -671,6 +671,7 @@ extension TerminalController {
             },
             permissionMode: inputs.permissionMode,
             autoResume: inputs.autoResume,
+            resumeEvidenceProvenance: inputs.resumeEvidenceProvenance,
             updatedAt: inputs.agentEventTime ?? Date.now.timeIntervalSince1970
         )
         guard let target = resolveSurfaceResumeTarget(

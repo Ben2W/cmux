@@ -25786,7 +25786,9 @@ struct CMUXCLI {
                         meta: AgentHookNotifyCategory.turnComplete.metaSegment(
                             pending: hasPendingBackgroundWork,
                             statusKey: Self.claudeCodeStatusKey,
-                            eventTime: hookEventTime
+                            eventTime: hookEventTime,
+                            agentKind: "claude",
+                            isSubagent: isNestedAgentSession
                         )
                     )
                     _ = try? sendV1Command("notify_target_async \(workspaceId) \(surfaceId) \(payload)", client: client)
@@ -25940,13 +25942,23 @@ struct CMUXCLI {
             )
             setAgentLifecycle(
                 client: client,
+                key: Self.claudeCodeStatusKey,
+                lifecycle: .running,
+                workspaceId: workspaceId,
+                surfaceId: surfaceId,
+                agentEventTime: hookEventTime
+            )
+            emitAgentJournalEvent(
+                client: client,
                 kind: .turnStarted,
                 source: "claude",
                 agentKey: Self.claudeCodeStatusKey,
                 sessionId: parsedInput.sessionId,
                 workspaceId: workspaceId,
                 surfaceId: surfaceId,
-                agentEventTime: hookEventTime
+                nativeEvent: reportedHookEventName(from: parsedInput) ?? "UserPromptSubmit",
+                store: sessionStore,
+                telemetry: telemetry
             )
             try setClaudeStatus(
                 client: client,
@@ -26166,7 +26178,9 @@ struct CMUXCLI {
                 meta: notifyCategory.metaSegment(
                     pending: notifyPending,
                     statusKey: Self.claudeCodeStatusKey,
-                    eventTime: hookEventTime
+                    eventTime: hookEventTime,
+                    agentKind: "claude",
+                    isSubagent: isNestedAgentSession
                 )
             )
 
@@ -26512,13 +26526,23 @@ struct CMUXCLI {
                 }
                 setAgentLifecycle(
                     client: client,
+                    key: Self.claudeCodeStatusKey,
+                    lifecycle: .needsInput,
+                    workspaceId: workspaceId,
+                    surfaceId: existingSurfaceId,
+                    agentEventTime: hookEventTime
+                )
+                emitAgentJournalEvent(
+                    client: client,
                     kind: toolName == "AskUserQuestion" ? .questionRequested : .planReviewRequested,
                     source: "claude",
                     agentKey: Self.claudeCodeStatusKey,
                     sessionId: sessionId,
                     workspaceId: workspaceId,
                     surfaceId: existingSurfaceId,
-                    agentEventTime: hookEventTime
+                    nativeEvent: reportedHookEventName(from: parsedInput) ?? "PreToolUse",
+                    store: sessionStore,
+                    telemetry: telemetry
                 )
                 // In bypassPermissions (--dangerously-skip-permissions) mode no
                 // PermissionRequest or Notification hook follows, so this handler must
@@ -26560,7 +26584,9 @@ struct CMUXCLI {
                         meta: AgentHookNotifyCategory.needsPermission.metaSegment(
                             pending: false,
                             statusKey: Self.claudeCodeStatusKey,
-                            eventTime: hookEventTime
+                            eventTime: hookEventTime,
+                            agentKind: "claude",
+                            isSubagent: isNestedAgentSession
                         )
                     )
                     _ = try? sendV1Command(
@@ -26594,13 +26620,23 @@ struct CMUXCLI {
             )
             setAgentLifecycle(
                 client: client,
+                key: Self.claudeCodeStatusKey,
+                lifecycle: .running,
+                workspaceId: workspaceId,
+                surfaceId: surfaceId,
+                agentEventTime: hookEventTime
+            )
+            emitAgentJournalEvent(
+                client: client,
                 kind: .turnStarted,
                 source: "claude",
                 agentKey: Self.claudeCodeStatusKey,
                 sessionId: parsedInput.sessionId,
                 workspaceId: workspaceId,
                 surfaceId: surfaceId,
-                agentEventTime: hookEventTime
+                nativeEvent: reportedHookEventName(from: parsedInput) ?? "PreToolUse",
+                store: sessionStore,
+                telemetry: telemetry
             )
 
             let statusValue: String
@@ -28659,7 +28695,9 @@ struct CMUXCLI {
             let meta = AgentHookNotifyCategory.needsPermission.metaSegment(
                 pending: false,
                 statusKey: "codex",
-                eventTime: agentEventTime
+                eventTime: agentEventTime,
+                agentKind: "codex",
+                isSubagent: false
             )
             let payload = notificationPayload(title: "Codex", subtitle: subtitle, body: body, meta: meta)
             _ = try? sendV1Command("notify_target_async \(workspaceId) \(surfaceId) \(payload)", client: client)
@@ -28683,7 +28721,9 @@ struct CMUXCLI {
             let meta = AgentHookNotifyCategory.other.metaSegment(
                 pending: false,
                 statusKey: "codex",
-                eventTime: agentEventTime
+                eventTime: agentEventTime,
+                agentKind: "codex",
+                isSubagent: false
             )
             let payload = notificationPayload(
                 title: "Codex",
@@ -33044,7 +33084,9 @@ export default CMUXSessionRestore;
                     : AgentHookNotifyCategory.other).metaSegment(
                         pending: antigravityHasActiveBackgroundWork,
                         statusKey: def.statusKey,
-                        eventTime: hookEventTime
+                        eventTime: hookEventTime,
+                        agentKind: def.name,
+                        isSubagent: isNestedAgentSession
                     )
                 let payload = notificationPayload(
                     title: notificationTitle(workspaceId: workspaceId, surfaceId: surfaceId),
@@ -33559,7 +33601,9 @@ export default CMUXSessionRestore;
                     pending: (summary.notifyCategory == .turnComplete || summary.notifyCategory == .idleReminder)
                         && hasActiveAntigravityBackgroundWork(),
                     statusKey: def.statusKey,
-                    eventTime: hookEventTime
+                    eventTime: hookEventTime,
+                    agentKind: def.name,
+                    isSubagent: isNestedAgentSession
                 )
                 let payload = notificationPayload(
                     title: notificationTitle(workspaceId: workspaceId, surfaceId: surfaceId),
