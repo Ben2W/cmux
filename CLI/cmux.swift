@@ -32979,7 +32979,7 @@ export default CMUXSessionRestore;
             )
             let suppressVisibleMutations = shouldSuppressNestedAgentVisibleMutations(
                 currentAgentPID: pid,
-                nestedPromptEvent: nestedPromptStop,
+                nestedPromptEvent: promptStopResult?.suppressesVisibleMutations ?? false,
                 transcriptSubagentSession: codexSubagentSignals.isSubagentSession,
                 precomputedNestedDetection: isNestedAgentSession,
                 env: env

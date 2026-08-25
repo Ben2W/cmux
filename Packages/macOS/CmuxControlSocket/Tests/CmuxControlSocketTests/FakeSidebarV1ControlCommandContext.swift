@@ -15,6 +15,7 @@ final class FakeSidebarV1ControlCommandContext: ControlCommandContext {
         key: String,
         panelID: UUID?,
         clearStatus: Bool,
+        agentEventTime: TimeInterval?,
         requireOwnedKey: Bool
     )?
     nonisolated(unsafe) var shellStateCall: (

@@ -91,6 +91,7 @@ final class FakeSurfaceControlCommandContext: ControlCommandContext {
         hasResolvedWindowID: Bool,
         expectedCheckpointID: String?,
         expectedSource: String?,
+        agentEventTime: TimeInterval?,
         agentSessionEnded: Bool
     ) -> ControlSurfaceResumeResolution {
         resumeClearAgentSessionEnded = agentSessionEnded

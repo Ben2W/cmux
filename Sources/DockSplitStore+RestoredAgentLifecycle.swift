@@ -245,6 +245,22 @@ extension DockSplitStore {
         )
     }
 
+    /// Compatibility accessors for Dock feed/test callers that work with a
+    /// complete sidebar row rather than the decomposed runtime mutation API.
+    func agentRuntimeStatusEntry(key: String, panelId: UUID) -> SidebarStatusEntry? {
+        agentRuntimeByPanelId[panelId]?.statusEntries[key]
+    }
+
+    func setAgentRuntimeStatusEntry(
+        _ entry: SidebarStatusEntry,
+        key: String,
+        panelId: UUID
+    ) {
+        mutateAgentRuntime(panelId: panelId) { runtime in
+            runtime.statusEntries[key] = entry
+        }
+    }
+
     @discardableResult
     func upsertAgentRuntimeStatusEntry(
         key: String,
@@ -259,7 +275,7 @@ extension DockSplitStore {
         agentEventTime: TimeInterval?
     ) -> SidebarStatusEntryReplacementDecision {
         var replacementDecision: SidebarStatusEntryReplacementDecision = .stale
-        mutateAgentRuntime(panelId: panelId) { runtime in
+        mutateAgentRuntime(panelId: panelId, updatesAgentAttention: true) { runtime in
             let isStructuredAgentStatus = AgentHibernationLifecycleStatusKeys.allowedStatusKeys.contains(key)
             let hasLifecycleWatermark = runtime.agentLifecycleEventTimes[key] != nil
             guard Self.acceptAgentRuntimeMutation(
@@ -324,7 +340,7 @@ extension DockSplitStore {
         enforceAgentEventOrdering: Bool = false
     ) -> Bool {
         var didReplaceRuntime = false
-        mutateAgentRuntime(panelId: panelId) { runtime in
+        mutateAgentRuntime(panelId: panelId, updatesAgentAttention: true) { runtime in
             let statusKey = Self.agentStatusKey(forAgentPIDKey: key, runtime: runtime)
             guard Self.acceptAgentRuntimeMutation(
                 statusKey: statusKey,
@@ -367,7 +383,7 @@ extension DockSplitStore {
         enforceAgentEventOrdering: Bool = false
     ) -> Bool {
         var didSet = false
-        mutateAgentRuntime(panelId: panelId) {
+        mutateAgentRuntime(panelId: panelId, updatesAgentAttention: true) {
             guard Self.acceptAgentRuntimeMutation(
                 statusKey: key,
                 agentEventTime: agentEventTime,
@@ -406,7 +422,7 @@ extension DockSplitStore {
             return false
         }
         var didChange = false
-        mutateAgentRuntime(panelId: panelId) { runtime in
+        mutateAgentRuntime(panelId: panelId, updatesAgentAttention: true) { runtime in
             let statusKey = Self.agentStatusKey(forAgentPIDKey: key, runtime: runtime)
             guard Self.acceptAgentRuntimeMutation(
                 statusKey: statusKey,

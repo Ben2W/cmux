@@ -511,6 +511,9 @@ extension Workspace {
         discardRemotePTYSessionID(panelId: panelId)
         surfaceResumeBindingsByPanelId.removeValue(forKey: panelId)
         surfaceResumeBindingEventTimesByPanelId.removeValue(forKey: panelId)
+        pendingPlainSSHRestorePanelIds.remove(panelId)
+        observedPlainSSHPanelIds.remove(panelId)
+        plainSSHDetectionMissesByPanelId.removeValue(forKey: panelId)
         surfaceListeningPorts.removeValue(forKey: panelId)
         restoredTerminalScrollbackByPanelId.removeValue(forKey: panelId)
 #if DEBUG
