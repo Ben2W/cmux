@@ -299,7 +299,7 @@ extension CMUXCLI {
         arguments: String
     ) -> String {
         let captureTime = agentHookCaptureTimeShell()
-        return #"hook_captured_at="$(\#(captureTime))"; if [ -n "$hook_captured_at" ]; then CMUX_AGENT_HOOK_CAPTURED_AT="$hook_captured_at" \#(executable) \#(arguments); else \#(executable) \#(arguments); fi"#
+        return #"hook_captured_at="$(\#(captureTime))"; if [ -n "$hook_captured_at" ]; then CMUX_AGENT_HOOK_CAPTURED_AT="$hook_captured_at" \#(executable) \#(arguments); else CMUX_AGENT_HOOK_CAPTURED_AT="" \#(executable) \#(arguments); fi"#
     }
 
     private static let grokPinnedHookMarker = "cmux-grok-hook-v2"

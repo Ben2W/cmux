@@ -1177,6 +1177,7 @@ struct RestorableAgentSessionIndex: Sendable {
             revalidatedEntries[key] = Entry(
                 snapshot: entry.snapshot,
                 lifecycle: entry.lifecycle,
+                runtimeStatusEventTime: entry.runtimeStatusEventTime,
                 updatedAt: entry.updatedAt,
                 processLiveness: processLiveness,
                 processIDs: currentPanelProcessIDs,

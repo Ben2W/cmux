@@ -5493,6 +5493,15 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             invalidatedRestoredAgentFingerprintsByPanelId.removeValue(forKey: panelId)
         }
         surfaceResumeBindingsByPanelId[panelId] = binding
+        if binding.isPlainSSHProcessDetectedBinding {
+            observedPlainSSHPanelIds.insert(panelId)
+            pendingPlainSSHRestorePanelIds.remove(panelId)
+            plainSSHDetectionMissesByPanelId[panelId] = 0
+        } else {
+            observedPlainSSHPanelIds.remove(panelId)
+            pendingPlainSSHRestorePanelIds.remove(panelId)
+            plainSSHDetectionMissesByPanelId.removeValue(forKey: panelId)
+        }
         recordSurfaceResumeBindingMutation(panelId: panelId, eventTime: binding.updatedAt)
         return true
     }
@@ -5503,6 +5512,9 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         eventTime: TimeInterval? = nil
     ) -> Bool {
         let removed = surfaceResumeBindingsByPanelId.removeValue(forKey: panelId)
+        pendingPlainSSHRestorePanelIds.remove(panelId)
+        observedPlainSSHPanelIds.remove(panelId)
+        plainSSHDetectionMissesByPanelId.removeValue(forKey: panelId)
         recordSurfaceResumeBindingMutation(
             panelId: panelId,
             eventTime: eventTime ?? Date.now.timeIntervalSince1970

@@ -46,9 +46,10 @@ final class FakeSidebarV1ControlCommandContext: ControlCommandContext {
         key: String,
         panelID: UUID?,
         clearStatus: Bool,
+        agentEventTime: TimeInterval?,
         requireOwnedKey: Bool
     ) {
-        agentPIDClearCall = (target, key, panelID, clearStatus, requireOwnedKey)
+        agentPIDClearCall = (target, key, panelID, clearStatus, agentEventTime, requireOwnedKey)
     }
 
     nonisolated func controlSidebarScheduleScopedShellState(

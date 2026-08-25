@@ -1097,6 +1097,7 @@ final class ClaudeHookSessionStore {
             lastEmittedNotificationFingerprint: nil,
             lastEmittedNotificationAt: nil,
             runtimeStatus: nil,
+            runtimeStatusEventTime: state.sessionTombstones[sessionId]?.eventTime,
             activePromptDepth: nil,
             activePromptTurnId: nil,
             activePromptTurnIds: nil,
@@ -1105,7 +1106,6 @@ final class ClaudeHookSessionStore {
             startedAt: now,
             updatedAt: now
         )
-        record.runtimeStatusEventTime = state.sessionTombstones[sessionId]?.eventTime
         return record
     }
 
@@ -25458,6 +25458,15 @@ struct CMUXCLI {
                 env: ProcessInfo.processInfo.environment,
                 fallbackPID: claudePid
             )
+            let forkParentSessionId = isForkSessionLaunch
+                ? claudeForkSessionParentId(
+                    env: ProcessInfo.processInfo.environment,
+                    fallbackPID: claudePid
+                )
+                : nil
+            let isForkParentSessionStart = isForkSessionLaunch
+                && forkParentSessionId != nil
+                && parsedInput.sessionId == forkParentSessionId
             let isClearSessionStart = isClaudeClearSessionStart(parsedInput)
             let sessionStartSource = parsedInput.object?["source"] as? String
             let canReplaceStoppedSession = shouldReplaceStoppedClaudeSession(
@@ -25467,9 +25476,9 @@ struct CMUXCLI {
                 surfaceId: resolvedSurface.isAuthoritative ? surfaceId : nil,
                 telemetry: telemetry
             )
-            let shouldPromoteActiveSession = !isForkSessionLaunch && (isClearSessionStart || canReplaceStoppedSession)
+            let shouldPromoteActiveSession = !isForkParentSessionStart && (isClearSessionStart || canReplaceStoppedSession)
             var acceptedSessionId: String?
-            if let sessionId = parsedInput.sessionId, !isForkSessionLaunch {
+            if let sessionId = parsedInput.sessionId, !isForkParentSessionStart {
                 // Non-clear SessionStart can arrive late from startup/resume/compact
                 // after /clear, so only /clear or replacement of a stopped owner
                 // establishes a new active boundary.
@@ -26184,7 +26193,43 @@ struct CMUXCLI {
                 )
             )
 
-            if let sessionId = parsedInput.sessionId, !suppressNeedsInputState {
+            let journalKind: AgentJournalEventKind
+            switch notificationType {
+            case "permission_prompt":
+                journalKind = .approvalRequested
+            case "idle_prompt":
+                journalKind = suppressNeedsInputState ? .stateChanged : .questionRequested
+            default:
+                switch classifiedSubtitle {
+                case "Permission":
+                    journalKind = .approvalRequested
+                case "Waiting":
+                    journalKind = suppressNeedsInputState ? .stateChanged : .questionRequested
+                case "Completed":
+                    journalKind = .turnCompleted
+                case "Error":
+                    journalKind = .errorReported
+                default:
+                    journalKind = summary.body.isEmpty ? .stateChanged : .questionRequested
+                }
+            }
+            emitAgentJournalEvent(
+                client: client,
+                kind: journalKind,
+                source: "claude",
+                agentKey: Self.claudeCodeStatusKey,
+                sessionId: parsedInput.sessionId,
+                workspaceId: workspaceId,
+                surfaceId: surfaceId,
+                isSubagent: isNestedAgentSession,
+                pendingWork: notifyPending,
+                nativeEvent: reportedHookEventName(from: parsedInput) ?? "Notification",
+                store: sessionStore,
+                telemetry: telemetry
+            )
+            let recordsNeedsInput = journalKind == .approvalRequested
+                || journalKind == .questionRequested
+            if let sessionId = parsedInput.sessionId, recordsNeedsInput, !summary.body.isEmpty {
                 let acceptedNotification = (try? sessionStore.upsert(
                     sessionId: sessionId,
                     workspaceId: workspaceId,
@@ -26203,7 +26248,7 @@ struct CMUXCLI {
                 }
             }
 
-            if !suppressNeedsInputState {
+            if recordsNeedsInput {
                 setAgentLifecycle(
                     client: client,
                     key: Self.claudeCodeStatusKey,
@@ -26731,7 +26776,7 @@ struct CMUXCLI {
         surfaceId: String?,
         agentEventTime: TimeInterval? = nil
     ) {
-        guard Self.allowedAgentLifecycleStatusKeys.contains(key) else {
+        guard AgentHibernationLifecycleStatusKeys.isAllowed(key) else {
             cliWriteStderr("Warning: unsupported agent lifecycle key\n")
             return
         }
@@ -32736,6 +32781,12 @@ export default CMUXSessionRestore;
                     workspaceId: workspaceId,
                     surfaceId: surfaceId,
                     agentEventTime: hookEventTime
+                )
+                emitJournal(
+                    .turnStarted,
+                    workspaceId: workspaceId,
+                    surfaceId: surfaceId,
+                    isSubagent: false
                 )
                 if codexPromptTurnWentTerminal() {
                     stopStaleCodexPromptSubmit(restoreVisibleState: true)
