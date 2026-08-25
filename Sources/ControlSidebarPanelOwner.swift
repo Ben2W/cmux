@@ -85,6 +85,10 @@ enum ControlSidebarPanelOwner {
         key: String,
         panelId: UUID?
     ) -> SidebarStatusEntryReplacementDecision {
+        // Feed attention is an app-owned mutation, not a detached hook event.
+        // Give it a fresh watermark so a prior hook timestamp cannot reject the
+        // needs-input row after the lifecycle mutation has already succeeded.
+        let feedEventTime = max(entry.agentEventTime ?? 0, Date.now.timeIntervalSince1970)
         upsertStatusEntry(
             key: key,
             value: entry.value,
@@ -95,7 +99,7 @@ enum ControlSidebarPanelOwner {
             format: entry.format,
             panelId: panelId,
             pid: nil,
-            agentEventTime: entry.agentEventTime
+            agentEventTime: feedEventTime
         )
     }
 

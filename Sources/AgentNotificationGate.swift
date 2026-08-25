@@ -40,38 +40,39 @@ struct AgentNotificationMeta {
         case "0": self.pending = false
         default: return nil
         }
+        var suffixIndex = 2
         var parsedAgentKind: String?
         var parsedIsSubagent: Bool?
         var parsedStatusKey: String?
         var parsedEventTime: TimeInterval?
-        for field in fields.dropFirst(2) {
-            if field.hasPrefix("a=") {
-                guard parsedAgentKind == nil else { return nil }
-                let value = String(field.dropFirst(2))
-                guard Self.isValidAgentKindTag(value) else { return nil }
-                parsedAgentKind = value
-            } else if field.hasPrefix("n=") {
-                guard parsedIsSubagent == nil else { return nil }
-                switch field.dropFirst(2) {
-                case "1": parsedIsSubagent = true
-                case "0": parsedIsSubagent = false
-                default: return nil
-                }
-            } else if field.hasPrefix("k=") {
-                guard parsedStatusKey == nil else { return nil }
-                let value = String(field.dropFirst(2))
-                guard !value.isEmpty,
-                      value.allSatisfy({ $0.isLetter || $0.isNumber || "._-".contains($0) }) else { return nil }
-                parsedStatusKey = value
-            } else if field.hasPrefix("t=") {
-                guard parsedEventTime == nil,
-                      let value = TimeInterval(field.dropFirst(2)),
-                      value.isPlausibleControlAgentEventTime else { return nil }
-                parsedEventTime = value
-            } else {
-                return nil
-            }
+        if suffixIndex < fields.count, fields[suffixIndex].hasPrefix("a=") {
+            let value = String(fields[suffixIndex].dropFirst(2))
+            guard Self.isValidAgentKindTag(value) else { return nil }
+            parsedAgentKind = value
+            suffixIndex += 1
         }
+        if suffixIndex < fields.count, fields[suffixIndex].hasPrefix("n=") {
+            switch fields[suffixIndex].dropFirst(2) {
+            case "1": parsedIsSubagent = true
+            case "0": parsedIsSubagent = false
+            default: return nil
+            }
+            suffixIndex += 1
+        }
+        if suffixIndex < fields.count {
+            guard fields[suffixIndex].hasPrefix("k=") else { return nil }
+            let statusKey = String(fields[suffixIndex].dropFirst(2))
+            guard !statusKey.isEmpty,
+                  statusKey.allSatisfy({ $0.isLetter || $0.isNumber || "._-".contains($0) }) else { return nil }
+            parsedStatusKey = statusKey
+            suffixIndex += 1
+            guard suffixIndex < fields.count, fields[suffixIndex].hasPrefix("t=") else { return nil }
+            guard let eventTime = TimeInterval(fields[suffixIndex].dropFirst(2)),
+                  eventTime.isPlausibleControlAgentEventTime else { return nil }
+            parsedEventTime = eventTime
+            suffixIndex += 1
+        }
+        guard suffixIndex == fields.count else { return nil }
         guard (parsedStatusKey == nil) == (parsedEventTime == nil) else { return nil }
         guard known != .other || parsedStatusKey != nil else { return nil }
         self.category = known

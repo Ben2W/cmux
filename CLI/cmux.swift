@@ -33038,20 +33038,7 @@ export default CMUXSessionRestore;
             let suppressCompletionNotification = suppressVisibleMutations
                 || codexSubagentSignals.hasSubagentNotificationRelay
 
-            // The journal records the turn boundary unconditionally: the
-            // reducer's per-session fold handles stale sessions (a newer
-            // running session outranks this one) and subagent tagging keeps
-            // nested sessions off the pane badge — no emit-side guessing.
             let stopHadFailure = codexFailure != nil || antigravityFailure != nil
-            emitJournal(
-                stopHadFailure ? .errorReported : .turnCompleted,
-                workspaceId: workspaceId,
-                surfaceId: surfaceId,
-                isSubagent: isNestedAgentSession,
-                pendingWork: antigravityHasActiveBackgroundWork,
-                detail: stopHadFailure ? body : nil
-            )
-
             if !sessionId.isEmpty, !suppressVisibleMutations {
                 let acceptedStop = (try? store.upsert(
                     sessionId: sessionId,
@@ -33088,6 +33075,19 @@ export default CMUXSessionRestore;
                     transcriptPath: transcriptPathForStore,
                     telemetry: telemetry,
                     agentEventTime: hookEventTime
+                )
+            }
+            // Commit the journal boundary only after the ordered store mutation
+            // accepted this event. A stale detached Stop must not outrank a
+            // newer running event in the append-only lifecycle stream.
+            if !staleIdleStopHasNewerRunningSession {
+                emitJournal(
+                    stopHadFailure ? .errorReported : .turnCompleted,
+                    workspaceId: workspaceId,
+                    surfaceId: surfaceId,
+                    isSubagent: isNestedAgentSession,
+                    pendingWork: antigravityHasActiveBackgroundWork,
+                    detail: stopHadFailure ? body : nil
                 )
             }
             if let pid, !suppressVisibleMutations {
