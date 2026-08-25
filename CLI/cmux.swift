@@ -25749,6 +25749,7 @@ struct CMUXCLI {
                     workspaceId: workspaceId,
                     surfaceId: surfaceId,
                     nativeEvent: reportedHookEventName(from: parsedInput) ?? "Stop",
+                    pendingWork: hasPendingBackgroundWork,
                     store: sessionStore,
                     telemetry: telemetry
                 )
@@ -26207,6 +26208,26 @@ struct CMUXCLI {
                     journalKind = summary.body.isEmpty ? .stateChanged : .questionRequested
                 }
             }
+            let recordsNeedsInput = journalKind == .approvalRequested
+                || journalKind == .questionRequested
+            if let sessionId = parsedInput.sessionId {
+                let acceptedNotification = (try? sessionStore.upsert(
+                    sessionId: sessionId,
+                    workspaceId: workspaceId,
+                    surfaceId: surfaceId,
+                    cwd: parsedInput.cwd,
+                    transcriptPath: parsedInput.transcriptPath,
+                    agentLifecycle: recordsNeedsInput && !summary.body.isEmpty ? .needsInput : nil,
+                    lastSubtitle: recordsNeedsInput && !summary.body.isEmpty ? summary.subtitle : nil,
+                    lastBody: recordsNeedsInput && !summary.body.isEmpty ? summary.body : nil,
+                    runtimeStatusEventTime: hookEventTime
+                ))?.accepted == true
+                guard acceptedNotification else {
+                    telemetry.breadcrumb("claude-hook.notification.stale-event")
+                    printClaudeHookAck()
+                    return
+                }
+            }
             emitAgentJournalEvent(
                 client: client,
                 kind: journalKind,
@@ -26221,27 +26242,6 @@ struct CMUXCLI {
                 store: sessionStore,
                 telemetry: telemetry
             )
-            let recordsNeedsInput = journalKind == .approvalRequested
-                || journalKind == .questionRequested
-            if let sessionId = parsedInput.sessionId, recordsNeedsInput, !summary.body.isEmpty {
-                let acceptedNotification = (try? sessionStore.upsert(
-                    sessionId: sessionId,
-                    workspaceId: workspaceId,
-                    surfaceId: surfaceId,
-                    cwd: parsedInput.cwd,
-                    transcriptPath: parsedInput.transcriptPath,
-                    agentLifecycle: .needsInput,
-                    lastSubtitle: summary.subtitle,
-                    lastBody: summary.body,
-                    runtimeStatusEventTime: hookEventTime
-                ))?.accepted == true
-                guard acceptedNotification else {
-                    telemetry.breadcrumb("claude-hook.notification.stale-event")
-                    printClaudeHookAck()
-                    return
-                }
-            }
-
             if recordsNeedsInput {
                 setAgentLifecycle(
                     client: client,
@@ -32442,10 +32442,11 @@ export default CMUXSessionRestore;
                     client: client
                 )
             }
-                emitJournal(
-                    .sessionStarted,
-                    workspaceId: workspaceId,
-                    surfaceId: surfaceId
+            emitJournal(
+                .sessionStarted,
+                workspaceId: workspaceId,
+                surfaceId: surfaceId,
+                isSubagent: suppressVisibleMutations
             )
             if !suppressVisibleMutations {
                 if let owner = try? store.lookup(sessionId: sessionId) {
@@ -32545,7 +32546,9 @@ export default CMUXSessionRestore;
                     emitJournal(
                         .stateChanged,
                         workspaceId: workspaceId,
-                        surfaceId: surfaceId
+                        surfaceId: surfaceId,
+                        declaredPhase: correctedPhase,
+                        detail: "stale-turn-corrected"
                     )
                 }
                 switch latest.runtimeStatus {

@@ -1426,12 +1426,11 @@ fi
 if [[ -n "$CMUX_SETTINGS_BASE_PATH" && "$CMUX_SETTINGS_PATH" != "$CMUX_SETTINGS_BASE_PATH" ]]; then
     rm -f -- "$CMUX_SETTINGS_BASE_PATH"
 fi
-unset CMUX_MERGED_SETTINGS_PATH cmux_merge_status CMUX_SETTINGS_INPUTS_PATH
-
 if [[ -n "$CMUX_SETTINGS_PATH" ]]; then
     cmux_claude_wrapper_schedule_settings_cleanup \
         "$CMUX_SETTINGS_PATH" "$CMUX_SETTINGS_BASE_PATH" "$CMUX_MERGED_SETTINGS_PATH"
 fi
+unset CMUX_MERGED_SETTINGS_PATH cmux_merge_status CMUX_SETTINGS_INPUTS_PATH
 
 # Capture only the compact post-merge argv. The previous implementation encoded
 # the inline JSON here as a second ARG_MAX multiplier.
