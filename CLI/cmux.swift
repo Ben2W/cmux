@@ -28694,16 +28694,17 @@ struct CMUXCLI {
                     )
                     return
                 case .healthy(let lastAssistantMessage):
-                    if let replay = CodexTranscriptMonitorStopReplay(
+                    guard let replayEventTime = sampleAgentHookEventTime(),
+                          let replay = CodexTranscriptMonitorStopReplay(
                         sessionId: sessionId,
                         turnId: turnId,
                         transcriptPath: currentTranscriptPath,
                         workspaceId: workspaceId,
                         surfaceId: surfaceId,
-                        lastAssistantMessage: lastAssistantMessage
-                    ) {
-                        try replayStop(replay)
-                    }
+                        lastAssistantMessage: lastAssistantMessage,
+                        agentEventTime: replayEventTime
+                    ) else { return }
+                    try replayStop(replay)
                     return
                 case .pending:
                     break
@@ -33115,7 +33116,7 @@ export default CMUXSessionRestore;
                     sessionId: sessionId,
                     cwd: cwd,
                     launchCommand: resumeLaunchCommand,
-                    transcriptPath: transcriptPathForStore,
+                    transcriptPath: input.transcriptPath ?? mapped?.transcriptPath,
                     telemetry: telemetry,
                     agentEventTime: hookEventTime
                 )
