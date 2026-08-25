@@ -384,7 +384,7 @@ extension Workspace {
                     pid: pid,
                     panelId: ownerPanelId,
                     agentEventTime: agentEventTime,
-                    enforceAgentEventOrdering: true
+                    enforceAgentEventOrdering: agentEventTime != nil
                 )
             }
         case .unchanged:
@@ -394,7 +394,7 @@ extension Workspace {
                     pid: pid,
                     panelId: ownerPanelId,
                     agentEventTime: agentEventTime,
-                    enforceAgentEventOrdering: true
+                    enforceAgentEventOrdering: agentEventTime != nil
                 )
             }
         case .stale:

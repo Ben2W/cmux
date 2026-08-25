@@ -318,7 +318,7 @@ extension DockSplitStore {
                 pid: pid,
                 panelId: panelId,
                 agentEventTime: agentEventTime,
-                enforceAgentEventOrdering: true
+                enforceAgentEventOrdering: agentEventTime != nil
             )
         }
         return replacementDecision

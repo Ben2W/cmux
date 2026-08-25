@@ -12,10 +12,10 @@ struct AgentRuntimeMutationOrdering {
         lifecycleEventTime: TimeInterval?,
         statusEventTime: TimeInterval?,
         replacementWatermark: TimeInterval?,
-        hasLifecycleState: Bool,
+        hasLifecycleState _: Bool,
         agentEventTime: TimeInterval?,
         enforceOrdering: Bool,
-        isLifecycleMutation: Bool
+        isLifecycleMutation _: Bool
     ) -> AgentRuntimeMutationOrderingDecision {
         guard enforceOrdering else {
             return AgentRuntimeMutationOrderingDecision(
@@ -47,10 +47,11 @@ struct AgentRuntimeMutationOrdering {
                 )
             }
         }
+        // Only the bounded built-in agent keys retain a durable watermark.
+        // Dynamically registered/custom lifecycle IDs are unbounded and must
+        // not accumulate per-panel timestamps after their state is cleared.
         let retainsDurableLifecycleWatermark =
             AgentHibernationLifecycleStatusKeys.allowedStatusKeys.contains(statusKey)
-            || isLifecycleMutation
-            || hasLifecycleState
         return AgentRuntimeMutationOrderingDecision(
             isAccepted: true,
             retainedEventTime: retainsDurableLifecycleWatermark ? agentEventTime : nil
