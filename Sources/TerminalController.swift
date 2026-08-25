@@ -12959,7 +12959,9 @@ class TerminalController {
                         pending: meta?.pending ?? false,
                         agentKind: meta?.agentKind,
                         isSubagent: meta?.isSubagent
-                    )
+                    ),
+                    agentStatusKey: meta?.agentStatusKey,
+                    agentEventTime: meta?.agentEventTime
                 )
                 return "OK"
             }
@@ -12989,7 +12991,9 @@ class TerminalController {
                     pending: meta?.pending ?? false,
                     agentKind: meta?.agentKind,
                     isSubagent: meta?.isSubagent
-                )
+                ),
+                agentStatusKey: meta?.agentStatusKey,
+                agentEventTime: meta?.agentEventTime
             )
             return "OK"
         }

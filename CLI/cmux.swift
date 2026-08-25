@@ -1535,14 +1535,6 @@ final class ClaudeHookSessionStore {
                     state.sessions[sessionId] = record
                     continue
                 }
-                if requireLiveProcess,
-                   !recordRepresentsActiveRunningSession(record, state: state) {
-                    record.runtimeStatus = nil
-                    record.updatedAt = now
-                    state.sessions[sessionId] = record
-                    continue
-                }
-
                 foundRunningSession = true
                 break
             }
@@ -25515,6 +25507,11 @@ struct CMUXCLI {
                 isClearSessionStart || canReplaceStoppedSession || isForkChildSessionStart
                     || !hasActiveSession || isSameActiveSession
             )
+            guard shouldPromoteActiveSession else {
+                telemetry.breadcrumb("claude-hook.session-start.non-promoted")
+                printClaudeHookAck()
+                return
+            }
             var acceptedSessionId: String?
             if let sessionId = parsedInput.sessionId, !isForkParentSessionStart {
                 // Non-clear SessionStart can arrive late from startup/resume/compact
@@ -25544,11 +25541,6 @@ struct CMUXCLI {
             }
             guard let acceptedSessionId else {
                 telemetry.breadcrumb("claude-hook.session-start.stale")
-                printClaudeHookAck()
-                return
-            }
-            guard shouldPromoteActiveSession else {
-                telemetry.breadcrumb("claude-hook.session-start.non-promoted")
                 printClaudeHookAck()
                 return
             }

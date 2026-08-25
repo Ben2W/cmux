@@ -18,6 +18,8 @@ extension TerminalController {
         body: String,
         replyShape: TerminalNotificationReplyShape = .none,
         agent: TerminalNotificationPolicyAgentContext? = nil,
+        agentStatusKey: String? = nil,
+        agentEventTime: TimeInterval? = nil,
         retargetsToLiveSurfaceOwner: Bool = true
     ) {
         let target: (tabId: UUID, surfaceId: UUID?)
@@ -35,6 +37,21 @@ extension TerminalController {
             // validated membership in its authorized workspace. Never global-
             // rehome that source-confined claim from an untrusted surface UUID.
             target = (tabId, surfaceId)
+        }
+        if let agentStatusKey, let agentEventTime {
+            guard let liveSurfaceId = target.surfaceId,
+                  let owner = TerminalController.shared.controlSidebarResolvePanelOwner(
+                      target: .workspace(target.tabId),
+                      panelID: liveSurfaceId
+                  ),
+                  owner.acceptAgentRuntimeMutation(
+                      statusKey: agentStatusKey,
+                      panelId: liveSurfaceId,
+                      agentEventTime: agentEventTime,
+                      enforceOrdering: true
+                  ) else {
+                return
+            }
         }
         if retargetsToLiveSurfaceOwner, let liveSurfaceId = target.surfaceId {
             // Supersede by canonical surface identity: stale-keyed local
