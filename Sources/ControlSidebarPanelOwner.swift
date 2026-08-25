@@ -89,7 +89,7 @@ enum ControlSidebarPanelOwner {
         // Give it a fresh watermark so a prior hook timestamp cannot reject the
         // needs-input row after the lifecycle mutation has already succeeded.
         let feedEventTime = max(entry.agentEventTime ?? 0, Date.now.timeIntervalSince1970)
-        upsertStatusEntry(
+        return upsertStatusEntry(
             key: key,
             value: entry.value,
             icon: entry.icon,

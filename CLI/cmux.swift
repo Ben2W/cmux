@@ -25506,22 +25506,6 @@ struct CMUXCLI {
                     return
                 }
                 acceptedSessionId = sessionId
-                if shouldPromoteActiveSession {
-                    publishAgentSurfaceResumeBinding(
-                        client: client,
-                        workspaceId: workspaceId,
-                        surfaceId: surfaceId,
-                        kind: "claude",
-                        displayName: String(localized: "cli.claude-hook.notification.title", defaultValue: "Claude Code"),
-                        sessionId: sessionId,
-                        cwd: parsedInput.cwd,
-                        launchCommand: launchCommand,
-                        transcriptPath: parsedInput.transcriptPath,
-                        observedPermissionMode: observedHookPermissionMode,
-                        telemetry: telemetry,
-                        agentEventTime: hookEventTime
-                    )
-                }
             }
             guard let acceptedSessionId else {
                 telemetry.breadcrumb("claude-hook.session-start.stale")
@@ -25763,7 +25747,10 @@ struct CMUXCLI {
                     agentKey: Self.claudeCodeStatusKey,
                     sessionId: parsedInput.sessionId,
                     workspaceId: workspaceId,
-                    surfaceId: surfaceId
+                    surfaceId: surfaceId,
+                    nativeEvent: reportedHookEventName(from: parsedInput) ?? "Stop",
+                    store: sessionStore,
+                    telemetry: telemetry
                 )
                 if hasPendingBackgroundWork {
                     // The turn ended but a background task or scheduled wakeup is
@@ -29834,13 +29821,23 @@ struct CMUXCLI {
             environment: resumeEnvironment,
             observedPermissionMode: observedPermissionMode
         ) else {
-            clearAgentSurfaceResumeBinding(
-                client: client,
-                workspaceId: workspaceId,
-                surfaceId: surfaceId,
-                sessionId: sessionId,
-                agentEventTime: agentEventTime
-            )
+            if kind == "codex" {
+                logCodexResumeBindingRejection(
+                    reason: "resume-command-unavailable",
+                    sessionId: sessionId,
+                    incoming: codexEvidenceProvenance,
+                    existing: nil,
+                    telemetry: telemetry
+                )
+            } else {
+                clearAgentSurfaceResumeBinding(
+                    client: client,
+                    workspaceId: workspaceId,
+                    surfaceId: surfaceId,
+                    sessionId: sessionId,
+                    agentEventTime: agentEventTime
+                )
+            }
             return
         }
         var params: [String: Any] = [
