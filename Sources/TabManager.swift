@@ -2499,6 +2499,7 @@ class TabManager: ObservableObject {
         notificationDismissal.setPendingSelectionContext(nil)
         notificationDismissal.setSuppressesFocusFlash(false)
         workspaceHandoffRetirementGate.cancel()
+        workspaceSwitchCoordinator.cancel()
         browserModel.clearRecentlyClosedBrowserPanels()
 
         tabs.removeAll()
