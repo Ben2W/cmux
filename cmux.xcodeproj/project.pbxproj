@@ -1445,6 +1445,7 @@
 		A11CE0060000000000000001 /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = A11CE0050000000000000001 /* LICENSE */; };
 		C0DE10166000000000000015 /* LinkCaptureSettingsSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE10166000000000000016 /* LinkCaptureSettingsSnapshot.swift */; };
 		C0DE10166000000000000017 /* LinksCaptureSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE10166000000000000018 /* LinksCaptureSettings.swift */; };
+		C0DE10166000000000000049 /* LinksLocalizationInterpolationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE1016600000000000004A /* LinksLocalizationInterpolationTests.swift */; };
 		C0DE1016600000000000001B /* LinksPaneContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE1016600000000000001C /* LinksPaneContent.swift */; };
 		C0DE10166000000000000005 /* LinksPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE10166000000000000006 /* LinksPanel.swift */; };
 		C0DE10166000000000000021 /* LinksPanelDayBucket.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE10166000000000000022 /* LinksPanelDayBucket.swift */; };
@@ -2106,6 +2107,7 @@
 		FE00310B /* SessionTranscriptPopoverLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE00300B /* SessionTranscriptPopoverLayout.swift */; };
 		FE00310C /* SessionTranscriptPopoverSizeModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE00300C /* SessionTranscriptPopoverSizeModel.swift */; };
 		F5320002A1B2C3D4E5F60718 /* SessionTranscriptTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5320003A1B2C3D4E5F60718 /* SessionTranscriptTypes.swift */; };
+		C0DE10166000000000000045 /* SessionWorkspaceLinksSnapshotCollection.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE10166000000000000046 /* SessionWorkspaceLinksSnapshotCollection.swift */; };
 		583A675AA1224E8D82A44883 /* SetAutoTitleSocketTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F92AB6D1CB714189A8F167E5 /* SetAutoTitleSocketTests.swift */; };
 		D10000000000000000A00020 /* SettingsAccountJSONResetBehaviorUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000000000000A00021 /* SettingsAccountJSONResetBehaviorUITests.swift */; };
 		D10000000000000000A00012 /* SettingsAppBehaviorUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000000000000A00013 /* SettingsAppBehaviorUITests.swift */; };
@@ -2948,6 +2950,7 @@
 		B63E1257BB174740A44F458C /* WorkspaceIsStaleAgentHookBindingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B714B27E46014592B9CB2D3A /* WorkspaceIsStaleAgentHookBindingTests.swift */; };
 		CA52B0180000000000000000 /* WorkspaceLayoutMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA52C0180000000000000000 /* WorkspaceLayoutMode.swift */; };
 		C0DE1016600000000000002D /* WorkspaceLinksIngestConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE1016600000000000002E /* WorkspaceLinksIngestConfiguration.swift */; };
+		C0DE10166000000000000047 /* WorkspaceLinksRestoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE10166000000000000048 /* WorkspaceLinksRestoreTests.swift */; };
 		C0DE10166000000000000043 /* WorkspaceLinksState+Settings.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE10166000000000000044 /* WorkspaceLinksState+Settings.swift */; };
 		C0DE10166000000000000001 /* WorkspaceLinksState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE10166000000000000002 /* WorkspaceLinksState.swift */; };
 		C0DE10166000000000000011 /* WorkspaceLinksTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE10166000000000000012 /* WorkspaceLinksTests.swift */; };
@@ -4477,6 +4480,7 @@
 		A11CE0050000000000000001 /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = SOURCE_ROOT; };
 		C0DE10166000000000000016 /* LinkCaptureSettingsSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Links/LinkCaptureSettingsSnapshot.swift; sourceTree = "<group>"; };
 		C0DE10166000000000000018 /* LinksCaptureSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Links/LinksCaptureSettings.swift; sourceTree = "<group>"; };
+		C0DE1016600000000000004A /* LinksLocalizationInterpolationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinksLocalizationInterpolationTests.swift; sourceTree = "<group>"; };
 		C0DE1016600000000000001C /* LinksPaneContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Links/UI/LinksPaneContent.swift; sourceTree = "<group>"; };
 		C0DE10166000000000000006 /* LinksPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/LinksPanel.swift; sourceTree = "<group>"; };
 		C0DE10166000000000000022 /* LinksPanelDayBucket.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Links/UI/LinksPanelDayBucket.swift; sourceTree = "<group>"; };
@@ -5132,6 +5136,7 @@ B8B056D80000000000000002 /* MobileHostIdentityTests.swift */ = {isa = PBXFileRef
 		FE00300B /* SessionTranscriptPopoverLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionTranscriptPopoverLayout.swift; sourceTree = "<group>"; };
 		FE00300C /* SessionTranscriptPopoverSizeModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionTranscriptPopoverSizeModel.swift; sourceTree = "<group>"; };
 		F5320003A1B2C3D4E5F60718 /* SessionTranscriptTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionTranscriptTypes.swift; sourceTree = "<group>"; };
+		C0DE10166000000000000046 /* SessionWorkspaceLinksSnapshotCollection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Links/Persistence/SessionWorkspaceLinksSnapshotCollection.swift; sourceTree = "<group>"; };
 		F92AB6D1CB714189A8F167E5 /* SetAutoTitleSocketTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetAutoTitleSocketTests.swift; sourceTree = "<group>"; };
 		D10000000000000000A00021 /* SettingsAccountJSONResetBehaviorUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsAccountJSONResetBehaviorUITests.swift; sourceTree = "<group>"; };
 		D10000000000000000A00013 /* SettingsAppBehaviorUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsAppBehaviorUITests.swift; sourceTree = "<group>"; };
@@ -5965,6 +5970,7 @@ B8B056D80000000000000002 /* MobileHostIdentityTests.swift */ = {isa = PBXFileRef
 		B714B27E46014592B9CB2D3A /* WorkspaceIsStaleAgentHookBindingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceIsStaleAgentHookBindingTests.swift; sourceTree = "<group>"; };
 		CA52C0180000000000000000 /* WorkspaceLayoutMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WorkspaceLayoutMode.swift"; sourceTree = "<group>"; };
 		C0DE1016600000000000002E /* WorkspaceLinksIngestConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Links/Model/WorkspaceLinksIngestConfiguration.swift; sourceTree = "<group>"; };
+		C0DE10166000000000000048 /* WorkspaceLinksRestoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceLinksRestoreTests.swift; sourceTree = "<group>"; };
 		C0DE10166000000000000044 /* WorkspaceLinksState+Settings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Links/Model/WorkspaceLinksState+Settings.swift"; sourceTree = "<group>"; };
 		C0DE10166000000000000002 /* WorkspaceLinksState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceLinksState.swift; sourceTree = "<group>"; };
 		C0DE10166000000000000012 /* WorkspaceLinksTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceLinksTests.swift; sourceTree = "<group>"; };
@@ -7267,6 +7273,7 @@ B8B056D80000000000000002 /* MobileHostIdentityTests.swift */ = {isa = PBXFileRef
 				0A110711000000000000001F /* TerminalOutputTeeContext.swift */,
 				C0DE10166000000000000016 /* LinkCaptureSettingsSnapshot.swift */,
 				C0DE10166000000000000018 /* LinksCaptureSettings.swift */,
+				C0DE10166000000000000046 /* SessionWorkspaceLinksSnapshotCollection.swift */,
 				C0DE1016600000000000000A /* TerminalLinkCaptureIngress.swift */,
 				C0DE1016600000000000001A /* TerminalLinkCaptureSettingsGate.swift */,
 				C0DE1016600000000000000E /* LinkTitleFetcher.swift */,
@@ -8977,6 +8984,8 @@ B8B056D80000000000000002 /* MobileHostIdentityTests.swift */ = {isa = PBXFileRef
 				DCE71A0F7E02A07A155241E4 /* SidebarWorkspaceRowStatusGlyphRemovalTests.swift */,
 				9C5C9824B98FFC44A2C44F47 /* WorkspaceTodoSnapshotTests.swift */,
 				C0DE10166000000000000012 /* WorkspaceLinksTests.swift */,
+				C0DE10166000000000000048 /* WorkspaceLinksRestoreTests.swift */,
+				C0DE1016600000000000004A /* LinksLocalizationInterpolationTests.swift */,
 				9F007352E96022D7EFBE73C9 /* WorkspaceTodoSidebarModelTests.swift */,
 				5B0C00010000000000000004 /* SidebarResizerOcclusionResolverTests.swift */,
 				5B0C00010000000000000006 /* PortalDividerCursorOcclusionTests.swift */,
@@ -11038,6 +11047,7 @@ B8B056D80000000000000002 /* MobileHostIdentityTests.swift */ = {isa = PBXFileRef
 				FE00310B /* SessionTranscriptPopoverLayout.swift in Sources */,
 				FE00310C /* SessionTranscriptPopoverSizeModel.swift in Sources */,
 				F5320002A1B2C3D4E5F60718 /* SessionTranscriptTypes.swift in Sources */,
+				C0DE10166000000000000045 /* SessionWorkspaceLinksSnapshotCollection.swift in Sources */,
 				D9CCF002D9CCF002D9CCF002 /* SettingsLazyLoadHelpers.swift in Sources */,
 				D5671401D5671401D5671401 /* SettingsNavigation+TerminalScrollSpeed.swift in Sources */,
 				A50019A0 /* SettingsNavigation.swift in Sources */,
@@ -12322,6 +12332,7 @@ B8B056D80000000000000002 /* MobileHostIdentityTests.swift */ = {isa = PBXFileRef
 				8582A1000000000000000002 /* KimiResumeReviewRegressionTests.swift in Sources */,
 				87C609D63F03597AC12C8B0A /* LastSurfaceClosePreferenceTests.swift in Sources */,
 				9492CAFE0000000000000002 /* LastTerminalChildExitRecoveryTests.swift in Sources */,
+				C0DE10166000000000000049 /* LinksLocalizationInterpolationTests.swift in Sources */,
 				540A9F26DCDFD0C16B257D6F /* LocalSurfaceProviderTests.swift in Sources */,
 				7690848956F4C55873F767F6 /* MachinesPanelModelTests.swift in Sources */,
 				A7C0F0010000000000000002 /* MacPairedMacBackupPublisherScopeTests.swift in Sources */,
@@ -12684,6 +12695,7 @@ B8B056D80000000000000002 /* MobileHostIdentityTests.swift */ = {isa = PBXFileRef
 				9164A0019164A0019164A001 /* WorkspaceGroupNumberedSelectionTests.swift in Sources */,
 				C9A57001C9A57001C9A57001 /* WorkspaceGroupTests.swift in Sources */,
 				B63E1257BB174740A44F458C /* WorkspaceIsStaleAgentHookBindingTests.swift in Sources */,
+				C0DE10166000000000000047 /* WorkspaceLinksRestoreTests.swift in Sources */,
 				C0DE10166000000000000011 /* WorkspaceLinksTests.swift in Sources */,
 				0F2C25F9170130F8DC09DD1B /* WorkspaceManualUnreadTests.swift in Sources */,
 				1A1B2C3D4E5F607180000003 /* WorkspacePromptSubmitTests.swift in Sources */,
