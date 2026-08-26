@@ -3073,8 +3073,11 @@ struct ContentView: View {
                   (notification.object as? NSWindow) === observedWindow else {
                 return
             }
-            AppDelegate.shared?.tabManagerFor(windowId: windowId)?
-                .workspaceSwitchCoordinator.noteInteractionNoLongerRequired()
+            if let manager = AppDelegate.shared?.tabManagerFor(windowId: windowId) {
+                manager.workspaceSwitchCoordinator.noteInteractionNoLongerRequired(
+                    workspaceID: manager.selectedTabId
+                )
+            }
         })
 
         view = AnyView(view.onReceive(NotificationCenter.default.publisher(for: NSText.didBeginEditingNotification)) { notification in
@@ -3675,7 +3678,8 @@ struct ContentView: View {
         reason: String
     ) {
         tabManager.workspaceSwitchCoordinator.sourceWillRetire(
-            workspaceID: retiringWorkspaceID
+            workspaceID: retiringWorkspaceID,
+            targetWorkspaceID: tabManager.selectedTabId
         )
 
         // Unmount teardown does not hide portals during transient rebuilds or
