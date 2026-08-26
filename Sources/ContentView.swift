@@ -8196,6 +8196,8 @@ struct ContentView: View {
         )
 
         let cmuxConfigDefaultSubtitle = String(localized: "command.cmuxConfig.subtitle", defaultValue: "cmux.json")
+        let pluginContributions = pluginCommandPaletteContributions()
+        let activePluginCommandIDs = Set(pluginContributions.map(\.commandId))
         for issue in cmuxConfigStore.configurationIssues {
             contributions.append(
                 CommandPaletteCommandContribution(
@@ -8207,7 +8209,7 @@ struct ContentView: View {
             )
         }
         for action in cmuxConfigStore.paletteCustomActions() {
-            guard !action.id.hasPrefix("plugin.") else { continue }
+            guard !activePluginCommandIDs.contains(action.id) else { continue }
             let actionTitle = sanitizeCmuxConfigPaletteText(action.title)
             let subtitleText = action.subtitle
                 .map { sanitizeCmuxConfigPaletteText($0) }
@@ -8223,7 +8225,7 @@ struct ContentView: View {
             )
         }
 
-        contributions.append(contentsOf: pluginCommandPaletteContributions())
+        contributions.append(contentsOf: pluginContributions)
 
         return contributions
     }
@@ -9060,8 +9062,11 @@ struct ContentView: View {
                 openCmuxConfigIssue(captured)
             }
         }
+        let activePluginCommandIDs = Set(
+            pluginCommandPaletteContributions().map(\.commandId)
+        )
         for action in cmuxConfigStore.paletteCustomActions() {
-            guard !action.id.hasPrefix("plugin.") else { continue }
+            guard !activePluginCommandIDs.contains(action.id) else { continue }
             let captured = action
             registry.register(commandId: action.id) {
                 executeConfiguredAction(captured)
