@@ -1121,6 +1121,7 @@ mod tests {
             .await
             .expect("parent cancellation must close the tunnel promptly");
         assert!(spawn_dropped.load(Ordering::Acquire), "blocked open task must be dropped");
+        assert_eq!(rig.manager.opening_count(), 0, "open reservation must be released");
         assert_eq!(rig.manager.attachment_count(), 0);
     }
 
@@ -1144,6 +1145,7 @@ mod tests {
             .await
             .expect("peer EOF must close the tunnel promptly");
         assert!(spawn_dropped.load(Ordering::Acquire), "blocked open task must be dropped");
+        assert_eq!(rig.manager.opening_count(), 0, "open reservation must be released");
         assert_eq!(rig.manager.attachment_count(), 0);
         rig.cancel.cancel();
     }
