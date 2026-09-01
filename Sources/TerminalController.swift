@@ -2863,7 +2863,6 @@ class TerminalController {
             "vm.tree",
             "vm.terminal_open",
             "vm.terminal_new",
-            "vm.terminal_close",
             "vm.terminal_rename",
             "vm.workspace_new",
             "vm.workspace_open",
