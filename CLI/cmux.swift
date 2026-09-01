@@ -2875,8 +2875,7 @@ final class SocketClient {
     /// Deferred password source invoked only after an auth-required reply.
     var authenticationPasswordProvider: ((Date?) -> String?)?
     var authenticationPasswordResolutionAttempted = false
-    var authenticationModeEstablished = false
-    var authenticationModeCoordinator: SocketAuthenticationModeCoordinator?
+    var authenticationModeCoordinator = SocketAuthenticationModeCoordinator()
     var authenticationInProgress = false
     var socketAuthenticated = false
     private static let defaultResponseTimeoutSeconds: TimeInterval = 15.0
@@ -3046,6 +3045,7 @@ final class SocketClient {
         socketAuthenticated = false
     }
 
+    /// Installs immediate and deferred credentials for a socket connection.
     func configureAuthentication(
         password: String?,
         passwordProvider: ((Date?) -> String?)? = nil,
@@ -3053,9 +3053,10 @@ final class SocketClient {
     ) {
         authenticationPassword = password
         authenticationPasswordProvider = passwordProvider
-        self.authenticationModeCoordinator = authenticationModeCoordinator
+        if let authenticationModeCoordinator {
+            self.authenticationModeCoordinator = authenticationModeCoordinator
+        }
         authenticationPasswordResolutionAttempted = false
-        authenticationModeEstablished = authenticationModeCoordinator?.current == .credentialFree
         socketAuthenticated = password == nil
     }
 
@@ -3219,6 +3220,7 @@ final class SocketClient {
         return response
     }
 
+    /// Writes a fire-and-forget command without waiting for a response.
     func sendOneWay(command: String, writeTimeout: TimeInterval) throws {
         if relayEndpoint != nil, socketFD < 0 {
             try connect()
@@ -4057,6 +4059,7 @@ final class SocketClient {
             .joined(separator: "\n")
     }
 
+    /// Sends a v2 request and forwards subsequent event-stream lines.
     func streamV2(
         method: String,
         params: [String: Any] = [:],
@@ -8452,6 +8455,7 @@ struct CMUXCLI {
         return client
     }
 
+    /// Configures a client with the process-scoped lazy credential resolver.
     func authenticateClientIfNeeded(
         _ client: SocketClient,
         explicitPassword: String?,
@@ -8473,6 +8477,7 @@ struct CMUXCLI {
         )
     }
 
+    /// Configures and performs immediate authentication for a socket client.
     static func authenticateSocketClientIfNeeded(
         _ client: SocketClient,
         responseTimeout: TimeInterval? = nil,
