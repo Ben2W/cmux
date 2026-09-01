@@ -5074,7 +5074,7 @@ impl Surface {
                 {
                     matches!(
                         &*pty.runtime.lock().unwrap(),
-                        PtyRuntime::Hosted(_) | PtyRuntime::ExitedHosted
+                        PtyRuntime::Hosted(_)
                     )
                 }
                 #[cfg(not(unix))]
@@ -5288,7 +5288,10 @@ impl Surface {
             Surface::Pty(pty) => {
                 #[cfg(unix)]
                 {
-                    matches!(&*pty.runtime.lock().unwrap(), PtyRuntime::Hosted(_))
+                    matches!(
+                        &*pty.runtime.lock().unwrap(),
+                        PtyRuntime::Hosted(_) | PtyRuntime::ExitedHosted
+                    )
                 }
                 #[cfg(not(unix))]
                 {
