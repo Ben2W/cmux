@@ -16836,24 +16836,27 @@ impl App {
         surface: SurfaceId,
         cell: (u16, u64),
         mode: SelectionMode,
-    ) -> Option<Selection> {
+    ) -> Option<(Selection, Option<u64>)> {
         if mode == SelectionMode::Cell {
-            return Some(Selection { surface, anchor: cell, head: cell });
+            return Some((Selection { surface, anchor: cell, head: cell }, None));
         }
         let point = Self::selection_point(cell)?;
         let handle = self.session.surface(surface)?;
-        let range = handle
-            .with_terminal(|terminal| match mode {
-                SelectionMode::Word => terminal.select_word_screen(point).ok().flatten(),
-                SelectionMode::Line => terminal
-                    .select_line_screen(point)
-                    .ok()
-                    .flatten()
-                    .or_else(|| terminal.select_line_screen_untrimmed(point).ok().flatten()),
-                SelectionMode::Cell => None,
+        let (range, content_generation) = handle
+            .with_terminal_and_generation(|terminal, generation| {
+                let range = match mode {
+                    SelectionMode::Word => terminal.select_word_screen(point).ok().flatten(),
+                    SelectionMode::Line => terminal
+                        .select_line_screen(point)
+                        .ok()
+                        .flatten()
+                        .or_else(|| terminal.select_line_screen_untrimmed(point).ok().flatten()),
+                    SelectionMode::Cell => None,
+                };
+                (range, generation)
             })
             .flatten()?;
-        Some(Self::selection_from_range(surface, range))
+        Some((Self::selection_from_range(surface, range), Some(content_generation)))
     }
 
     fn terminal_active_screen(&self, surface: SurfaceId) -> Option<Screen> {
@@ -22418,9 +22421,6 @@ impl App {
                         (x.saturating_sub(content.x), y.saturating_sub(content.y)),
                         modifiers,
                     );
-                    let content_generation = (mode != SelectionMode::Cell)
-                        .then(|| self.terminal_content_generation(area.surface))
-                        .flatten();
                     if mode == SelectionMode::Cell && modifiers == KeyModifiers::NONE {
                         // Ghostty's cell behavior returns no range on press.
                         // Keep only the tracked anchor until a drag moves it.
@@ -22428,7 +22428,8 @@ impl App {
                     } else {
                         self.selection_mode = mode;
                         self.selection_mode_surface = Some(area.surface);
-                        if let Some(selection) = self.selection_for_click(area.surface, cell, mode)
+                        if let Some((selection, content_generation)) =
+                            self.selection_for_click(area.surface, cell, mode)
                         {
                             if let Some(sequence) = self.selection_click_sequence.as_mut()
                                 && mode != SelectionMode::Cell
