@@ -17056,6 +17056,24 @@ impl App {
             return;
         };
         let content_generation = self.terminal_content_generation(surface);
+        let initial_semantic_range = if mode == SelectionMode::Word {
+            self.selection_click_sequence
+                .as_ref()
+                .and_then(|sequence| sequence.semantic_range)
+                .filter(|initial| content_generation == Some(initial.content_generation))
+                .map(|initial| initial.range)
+        } else {
+            None
+        };
+        let generation_anchor_range = if mode == SelectionMode::Word
+            && initial_semantic_range.is_none()
+        {
+            handle
+                .with_terminal(|terminal| terminal.select_word_screen(anchor_point).ok().flatten())
+                .flatten()
+        } else {
+            initial_semantic_range
+        };
         if let Some(generation) = content_generation
             && let Some(cache) = self.semantic_selection_cache
             && cache.surface == surface
@@ -17085,11 +17103,18 @@ impl App {
                         .select_word_between_screen(current_point, anchor_point)
                         .ok()
                         .flatten()?;
+                    let initial = generation_anchor_range;
                     let current_before_anchor = (current.1, current.0) < (anchor.1, anchor.0);
                     Some(if current_before_anchor {
-                        SelectionRange { start: second.start, end: first.end }
+                        SelectionRange {
+                            start: initial.map_or(second.start, |range| range.start),
+                            end: first.end,
+                        }
                     } else {
-                        SelectionRange { start: first.start, end: second.end }
+                        SelectionRange {
+                            start: first.start,
+                            end: initial.map_or(second.end, |range| range.end),
+                        }
                     })
                 }
                 SelectionMode::Line => {
@@ -17113,12 +17138,8 @@ impl App {
             .flatten();
         let range = range.map(|range| {
             if mode == SelectionMode::Word {
-                self.selection_click_sequence
-                    .as_ref()
-                    .and_then(|sequence| sequence.semantic_range)
-                    .filter(|initial| content_generation == Some(initial.content_generation))
+                generation_anchor_range
                     .map(|initial| {
-                        let initial = initial.range;
                         let start = if (initial.start.row, initial.start.column)
                             <= (range.start.row, range.start.column)
                         {
@@ -17162,8 +17183,11 @@ impl App {
                         .semantic_range
                         .is_some_and(|initial| initial.content_generation == content_generation);
                     if !has_initial_range {
-                        sequence.semantic_range =
-                            Some(GenerationTaggedSelectionRange { content_generation, range });
+                        let baseline = generation_anchor_range.unwrap_or(range);
+                        sequence.semantic_range = Some(GenerationTaggedSelectionRange {
+                            content_generation,
+                            range: baseline,
+                        });
                     }
                 }
             } else {
