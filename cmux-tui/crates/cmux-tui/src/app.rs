@@ -27896,6 +27896,54 @@ mod tests {
     }
 
     #[test]
+    fn double_click_drag_back_shrinks_to_the_current_word() {
+        let (mut app, mux, surface, content) =
+            selection_fixture("double-click-word-drag-back-selection-test", b"alpha beta gamma");
+
+        let click = MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column: content.x + 7,
+            row: content.y,
+            modifiers: KeyModifiers::NONE,
+        };
+        app.handle_mouse(click).unwrap();
+        app.handle_mouse(MouseEvent { kind: MouseEventKind::Up(MouseButton::Left), ..click })
+            .unwrap();
+        app.handle_mouse(click).unwrap();
+
+        app.handle_mouse(MouseEvent {
+            kind: MouseEventKind::Drag(MouseButton::Left),
+            column: content.x + 13,
+            row: content.y,
+            modifiers: KeyModifiers::NONE,
+        })
+        .unwrap();
+        assert_eq!(
+            app.selection.map(|selection| selection.range()),
+            Some(((6, 0), (15, 0))),
+            "dragging forward must include the target word"
+        );
+
+        app.handle_mouse(MouseEvent {
+            kind: MouseEventKind::Drag(MouseButton::Left),
+            column: content.x + 7,
+            row: content.y,
+            modifiers: KeyModifiers::NONE,
+        })
+        .unwrap();
+        app.handle_mouse(MouseEvent { kind: MouseEventKind::Up(MouseButton::Left), ..click })
+            .unwrap();
+
+        assert_eq!(
+            app.selection.map(|selection| selection.range()),
+            Some(((6, 0), (9, 0))),
+            "dragging back must shrink to the current word instead of retaining the overshoot"
+        );
+
+        mux.close_surface(surface.id).unwrap();
+    }
+
+    #[test]
     fn double_click_drag_anchors_at_second_press() {
         let (mut app, mux, surface, content) =
             selection_fixture("double-click-second-press-anchor-test", b"a b c");
