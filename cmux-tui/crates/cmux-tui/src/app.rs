@@ -16842,8 +16842,8 @@ impl App {
         }
         let point = Self::selection_point(cell)?;
         let handle = self.session.surface(surface)?;
-        let (range, content_generation) = handle
-            .with_terminal_and_generation(|terminal, generation| {
+        let (range, content_generation) =
+            handle.with_terminal_and_generation(|terminal, generation| {
                 let range = match mode {
                     SelectionMode::Word => terminal.select_word_screen(point).ok().flatten(),
                     SelectionMode::Line => terminal
@@ -16854,8 +16854,8 @@ impl App {
                     SelectionMode::Cell => None,
                 };
                 (range, generation)
-            })
-            .flatten()?;
+            })?;
+        let range = range?;
         Some((Self::selection_from_range(surface, range), Some(content_generation)))
     }
 
