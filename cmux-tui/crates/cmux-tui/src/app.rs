@@ -27949,6 +27949,58 @@ mod tests {
     }
 
     #[test]
+    fn double_click_drag_back_shrinks_after_content_generation_change() {
+        let (mut app, mux, surface, content) =
+            selection_fixture("double-click-word-drag-generation-change-test", b"alpha beta gamma");
+
+        let click = MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column: content.x + 7,
+            row: content.y,
+            modifiers: KeyModifiers::NONE,
+        };
+        app.handle_mouse(click).unwrap();
+        app.handle_mouse(MouseEvent { kind: MouseEventKind::Up(MouseButton::Left), ..click })
+            .unwrap();
+        app.handle_mouse(click).unwrap();
+        app.handle_mouse(MouseEvent {
+            kind: MouseEventKind::Drag(MouseButton::Left),
+            column: content.x + 13,
+            row: content.y,
+            modifiers: KeyModifiers::NONE,
+        })
+        .unwrap();
+
+        // Simulate the terminal advancing while the pointer is held. The
+        // original word anchor must be recomputed for the new generation.
+        app.selection_click_sequence
+            .as_mut()
+            .expect("semantic click sequence")
+            .semantic_range
+            .as_mut()
+            .expect("semantic anchor range")
+            .content_generation = 0;
+
+        app.handle_mouse(MouseEvent {
+            kind: MouseEventKind::Drag(MouseButton::Left),
+            column: content.x + 7,
+            row: content.y,
+            modifiers: KeyModifiers::NONE,
+        })
+        .unwrap();
+        app.handle_mouse(MouseEvent { kind: MouseEventKind::Up(MouseButton::Left), ..click })
+            .unwrap();
+
+        assert_eq!(
+            app.selection.map(|selection| selection.range()),
+            Some(((6, 0), (9, 0))),
+            "dragging back after a generation change must shrink to the current word"
+        );
+
+        mux.close_surface(surface.id).unwrap();
+    }
+
+    #[test]
     fn double_click_drag_anchors_at_second_press() {
         let (mut app, mux, surface, content) =
             selection_fixture("double-click-second-press-anchor-test", b"a b c");
