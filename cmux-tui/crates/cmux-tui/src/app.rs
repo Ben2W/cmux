@@ -17107,13 +17107,13 @@ impl App {
                     let current_before_anchor = (current.1, current.0) < (anchor.1, anchor.0);
                     Some(if current_before_anchor {
                         SelectionRange {
-                            start: initial.map_or(second.start, |range| range.start),
-                            end: first.end,
+                            start: second.start,
+                            end: initial.map_or(first.end, |range| range.end),
                         }
                     } else {
                         SelectionRange {
-                            start: first.start,
-                            end: initial.map_or(second.end, |range| range.end),
+                            start: initial.map_or(first.start, |range| range.start),
+                            end: second.end,
                         }
                     })
                 }
