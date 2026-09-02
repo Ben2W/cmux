@@ -1349,7 +1349,11 @@ mod tests {
 
 #[cfg(test)]
 mod owner_identity_tests {
-    use super::{reconcile_owner_user_id, reconcile_owner_user_id_and_persist};
+    use std::io;
+
+    use super::{
+        owner_persist_failure_message, reconcile_owner_user_id, reconcile_owner_user_id_and_persist,
+    };
     use crate::config::{Config, load_config, save_config};
 
     #[test]
@@ -1417,6 +1421,15 @@ mod owner_identity_tests {
         assert_eq!(reloaded.owner_user_id, None);
         std::fs::remove_file(path).ok();
         std::fs::remove_file(blocker).ok();
+    }
+
+    #[test]
+    fn owner_persistence_error_hides_filesystem_details() {
+        let error = io::Error::new(io::ErrorKind::PermissionDenied, "/private/secret/config");
+        let message = owner_persist_failure_message(&error);
+
+        assert!(message.contains("reconnecting to retry"));
+        assert!(!message.contains("/private/secret/config"));
     }
 }
 
