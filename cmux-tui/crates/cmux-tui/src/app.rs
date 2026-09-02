@@ -17103,18 +17103,11 @@ impl App {
                         .select_word_between_screen(current_point, anchor_point)
                         .ok()
                         .flatten()?;
-                    let initial = generation_anchor_range;
                     let current_before_anchor = (current.1, current.0) < (anchor.1, anchor.0);
                     Some(if current_before_anchor {
-                        SelectionRange {
-                            start: second.start,
-                            end: initial.map_or(first.end, |range| range.end),
-                        }
+                        SelectionRange { start: second.start, end: first.end }
                     } else {
-                        SelectionRange {
-                            start: initial.map_or(first.start, |range| range.start),
-                            end: second.end,
-                        }
+                        SelectionRange { start: first.start, end: second.end }
                     })
                 }
                 SelectionMode::Line => {
