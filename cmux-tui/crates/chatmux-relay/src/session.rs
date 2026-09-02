@@ -1318,6 +1318,8 @@ mod tests {
 
 #[cfg(test)]
 mod owner_identity_tests {
+    use std::path::Path;
+
     use super::{reconcile_owner_user_id, reconcile_owner_user_id_and_persist};
     use crate::config::{Config, load_config, save_config};
 
@@ -1350,6 +1352,43 @@ mod owner_identity_tests {
         reconcile_owner_user_id_and_persist(&mut config, None, &path, false);
 
         let reloaded = load_config(&path).expect("persisted config loads");
+        assert_eq!(reloaded.owner_user_id, None);
+        std::fs::remove_file(path).ok();
+    }
+
+    #[test]
+    fn ownerless_reconnect_retries_after_persistence_failure() {
+        let path = std::env::temp_dir()
+            .join(format!("chatmux-relay-owner-reconnect-retry-{}.json", std::process::id()));
+        let mut config = Config {
+            device_id: "device".to_owned(),
+            token: "token".to_owned(),
+            owner_user_id: Some("previous-owner".to_owned()),
+            ..Config::default()
+        };
+        let mut pending = false;
+
+        let failure = reconcile_owner_user_id_and_persist(
+            &mut config,
+            None,
+            Path::new("/dev/null/chatmux-relay-owner.json"),
+            false,
+            &mut pending,
+        );
+        assert!(failure.is_err());
+        assert_eq!(config.owner_user_id, None);
+        assert!(pending);
+
+        let retry = reconcile_owner_user_id_and_persist(
+            &mut config,
+            None,
+            &path,
+            false,
+            &mut pending,
+        );
+        assert!(retry.is_ok());
+        assert!(!pending);
+        let reloaded = load_config(&path).expect("retried config saves");
         assert_eq!(reloaded.owner_user_id, None);
         std::fs::remove_file(path).ok();
     }
