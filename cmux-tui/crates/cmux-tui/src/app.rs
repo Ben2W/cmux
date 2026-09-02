@@ -17062,6 +17062,21 @@ impl App {
             self.semantic_selection_cache = None;
             return;
         };
+        if let Some(PointerSnapshotProbe::Ready(snapshot)) = handle.try_pointer_snapshot()
+            && let Some(cache) = self.semantic_selection_cache
+            && cache.surface == surface
+            && cache.mode == mode
+            && cache.anchor == anchor_point
+            && cache.current == current_point
+            && cache.content_generation == snapshot.content_generation
+        {
+            if let Some(range) = cache.range {
+                self.replace_selection(Some(Self::selection_from_range(surface, range)));
+            } else {
+                self.clear_selection_for_semantic_gesture(surface, mode);
+            }
+            return;
+        }
         let Some((content_generation, generation_anchor_range, range)) = handle
             .with_terminal_and_generation(|terminal, generation| {
                 let initial_semantic_range = if mode == SelectionMode::Word {
