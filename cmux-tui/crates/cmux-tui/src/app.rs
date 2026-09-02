@@ -17158,8 +17158,13 @@ impl App {
             if let (Some(content_generation), Some(range)) = (content_generation, range) {
                 sequence.semantic_content_generation = Some(content_generation);
                 if mode == SelectionMode::Word {
-                    sequence.semantic_range =
-                        Some(GenerationTaggedSelectionRange { content_generation, range });
+                    let has_initial_range = sequence
+                        .semantic_range
+                        .is_some_and(|initial| initial.content_generation == content_generation);
+                    if !has_initial_range {
+                        sequence.semantic_range =
+                            Some(GenerationTaggedSelectionRange { content_generation, range });
+                    }
                 }
             } else {
                 sequence.semantic_content_generation = None;
