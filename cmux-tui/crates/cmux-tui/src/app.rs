@@ -16854,7 +16854,7 @@ impl App {
                         .or_else(|| terminal.select_line_screen_untrimmed(point).ok().flatten()),
                     SelectionMode::Cell => None,
                 };
-                (range, generation)
+                Some((range, generation))
             })
             .flatten()?;
         let range = range?;
