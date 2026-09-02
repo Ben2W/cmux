@@ -5050,6 +5050,12 @@ impl Surface {
         }
     }
 
+    /// Read the latest PTY content generation without waiting for terminal
+    /// parsing or rendering to release the terminal lock.
+    pub fn content_generation_nonblocking(&self) -> Option<u64> {
+        self.as_pty().map(|pty| pty.render_generation.load(Ordering::Acquire))
+    }
+
     /// Resize this surface. PTYs receive cell dimensions; browsers also
     /// use the last configured cell pixel size for CDP device metrics.
     /// Returns whether a clamped size change was applied or accepted. Browser

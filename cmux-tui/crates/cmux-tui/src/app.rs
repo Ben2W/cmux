@@ -16866,16 +16866,7 @@ impl App {
         let handle = self.session.surface(surface)?;
         match handle.try_pointer_snapshot()? {
             PointerSnapshotProbe::Ready(snapshot) => Some(snapshot.content_generation),
-            PointerSnapshotProbe::Contended => {
-                // Wait for the parser's terminal lock, then retry the probe.
-                // Contention alone does not prove that the rendered content
-                // changed, so do not drop a valid semantic copy as stale.
-                handle.with_terminal(|_| ())?;
-                match handle.try_pointer_snapshot()? {
-                    PointerSnapshotProbe::Ready(snapshot) => Some(snapshot.content_generation),
-                    PointerSnapshotProbe::Contended => None,
-                }
-            }
+            PointerSnapshotProbe::Contended => handle.content_generation_nonblocking(),
         }
     }
 
