@@ -1347,10 +1347,12 @@ async fn request_control_with_cancellation(
     params: Value,
     cancellation: &CancellationToken,
 ) -> Option<Value> {
-    tokio::select! {
-        response = control.request(cmd, params) => response,
-        _ = cancellation.cancelled() => None,
+    if cancellation.is_cancelled() {
+        return None;
     }
+    // Once queued, let the mutation finish. Dropping this future cannot
+    // retract an attach request, so cancellation cleanup uses its lease.
+    control.request(cmd, params).await
 }
 
 impl Drop for ControlGuard {
@@ -2255,10 +2257,6 @@ impl Inner {
             &context.cancellation,
         )
         .await;
-        if context.cancellation.is_cancelled() {
-            self.end_control_if_unshared(&control);
-            return Err((RelayPtyErrorCode::Failed, "attachment canceled".to_owned()));
-        }
         if attached.as_ref().and_then(|v| v.get("ok")).and_then(Value::as_bool) != Some(true) {
             self.end_control_if_unshared(&control);
             let reason = attached
@@ -2279,6 +2277,18 @@ impl Inner {
             .and_then(Value::as_str)
             .filter(|v| !v.is_empty())
             .map(str::to_owned);
+        if context.cancellation.is_cancelled() {
+            if detach_supported {
+                if let Some(lease) = lease.as_deref() {
+                    let _ = control.send(
+                        "detach-attached-view",
+                        json!({ "surface": surface_id, "lease": lease }),
+                    );
+                }
+            }
+            self.end_control_if_unshared(&control);
+            return Err((RelayPtyErrorCode::Failed, "attachment canceled".to_owned()));
+        }
         if scoped_detach_advertised && lease.is_none() {
             self.end_control_if_unshared(&control);
             return Err((
