@@ -5497,8 +5497,10 @@ pub fn serve_paused(mux: Arc<Mux>, path: Option<PathBuf>) -> anyhow::Result<Pend
             let stream = match listener.accept_with_wake(&server_wake) {
                 Ok(Some(stream)) => stream,
                 Ok(None) => break,
-                Err(error) if accept_error_action(&error, server_shutdown.load(Ordering::Acquire))
-                    == AcceptErrorAction::Retry => {
+                Err(error)
+                    if accept_error_action(&error, server_shutdown.load(Ordering::Acquire))
+                        == AcceptErrorAction::Retry =>
+                {
                     match server_wake.wait(ACCEPT_RETRY_BACKOFF) {
                         Ok(true) => break,
                         Ok(false) => continue,
