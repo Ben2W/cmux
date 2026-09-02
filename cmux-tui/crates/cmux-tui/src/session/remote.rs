@@ -3614,7 +3614,11 @@ fn reject_extended_acl(directory: &fs::File) -> io::Result<()> {
         let error = io::Error::last_os_error();
         if matches!(
             error.raw_os_error(),
-            Some(libc::ENOTSUP) | Some(libc::EOPNOTSUPP) | Some(libc::ENOSYS)
+            Some(libc::ENOENT)
+                | Some(libc::ENOATTR)
+                | Some(libc::ENOTSUP)
+                | Some(libc::EOPNOTSUPP)
+                | Some(libc::ENOSYS)
         ) {
             return Ok(());
         }
