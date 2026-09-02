@@ -3505,24 +3505,35 @@ impl Drop for RemoteSession {
         #[cfg(unix)]
         {
             let Ok(directory) = private_dump_directory(dir) else { return };
-            let logs = self.frame_logs.lock().unwrap();
-            let mut entries_by_surface: HashMap<SurfaceId, Vec<&str>> = HashMap::new();
-            for entry in &logs.entries {
-                entries_by_surface.entry(entry.surface).or_default().push(&entry.line);
+            let mut entries_by_surface: HashMap<SurfaceId, Vec<String>> = HashMap::new();
+            {
+                let logs = self.frame_logs.lock().unwrap();
+                for entry in &logs.entries {
+                    entries_by_surface
+                        .entry(entry.surface)
+                        .or_default()
+                        .push(entry.line.clone());
+                }
             }
-            for surface in self.surfaces.lock().unwrap().values() {
+            let surfaces: Vec<Arc<RemoteSurface>> = self
+                .surfaces
+                .lock()
+                .unwrap()
+                .values()
+                .cloned()
+                .collect();
+            for surface in surfaces {
                 let mirror_name = format!("mirror-{}.txt", surface.id);
-                let mirror = dump_mirror(surface);
+                let mirror = dump_mirror(&surface);
                 let _ = write_private_dump(&directory, &mirror_name, |file| {
                     file.write_all(mirror.as_bytes())
                 });
                 let frames_name = format!("frames-{}.log", surface.id);
-                let _ = write_private_dump(&directory, &frames_name, |file| {
-                    for line in entries_by_surface.get(&surface.id).into_iter().flatten() {
-                        writeln!(file, "{line}")?;
-                    }
-                    Ok(())
-                });
+                let lines = entries_by_surface
+                    .get(&surface.id)
+                    .map(Vec::as_slice)
+                    .unwrap_or(&[]);
+                let _ = write_frame_dump(&directory, &frames_name, lines);
             }
         }
     }
@@ -3587,44 +3598,35 @@ fn private_dump_directory(path: &Path) -> io::Result<fs::File> {
 #[cfg(target_os = "macos")]
 fn reject_extended_acl(directory: &fs::File) -> io::Result<()> {
     use std::os::fd::AsRawFd;
-    use std::ptr;
 
-    // Any extended ACL can carry non-owner grants or inheritance. Reject the
-    // directory instead of trying to interpret ACE ordering and masks.
-    let descriptor = directory.as_raw_fd();
-    let size = unsafe { libc::flistxattr(descriptor, ptr::null_mut(), 0, 0) };
-    if size < 0 {
+    // `acl_get_fd_np` reads the effective macOS ACL from the opened
+    // descriptor, including inherited ACEs that are not exposed by the mode
+    // bits. Reject any extended ACL instead of attempting to interpret ACE
+    // ordering, principals, and inheritance flags here.
+    unsafe extern "C" {
+        fn acl_get_fd_np(fd: libc::c_int, acl_type: libc::c_int) -> *mut libc::c_void;
+        fn acl_free(object: *mut libc::c_void) -> libc::c_int;
+    }
+
+    const ACL_TYPE_EXTENDED: libc::c_int = 0x0000_0100;
+    let acl = unsafe { acl_get_fd_np(directory.as_raw_fd(), ACL_TYPE_EXTENDED) };
+    if acl.is_null() {
         let error = io::Error::last_os_error();
-        if matches!(error.raw_os_error(), Some(libc::ENOTSUP) | Some(libc::ENOSYS)) {
+        if matches!(
+            error.raw_os_error(),
+            Some(libc::ENOTSUP) | Some(libc::EOPNOTSUPP) | Some(libc::ENOSYS)
+        ) {
             return Ok(());
         }
         return Err(error);
     }
-    if size == 0 {
-        return Ok(());
+    unsafe {
+        acl_free(acl);
     }
-    let mut names = vec![0_u8; size as usize];
-    let size = unsafe {
-        libc::flistxattr(
-            descriptor,
-            names.as_mut_ptr().cast(),
-            names.len(),
-            0,
-        )
-    };
-    if size < 0 {
-        return Err(io::Error::last_os_error());
-    }
-    if names[..size as usize]
-        .split(|byte| *byte == 0)
-        .any(|name| name == b"com.apple.acl.text")
-    {
-        return Err(io::Error::new(
-            io::ErrorKind::PermissionDenied,
-            "dump directory has an extended ACL",
-        ));
-    }
-    Ok(())
+    Err(io::Error::new(
+        io::ErrorKind::PermissionDenied,
+        "dump directory has an extended ACL",
+    ))
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -3671,6 +3673,19 @@ fn private_dump_file(directory: &fs::File, name: &str) -> io::Result<fs::File> {
     // opened, and no previously existing file is truncated.
     file.set_permissions(fs::Permissions::from_mode(0o600))?;
     Ok(file)
+}
+
+#[cfg(unix)]
+fn write_frame_dump(directory: &fs::File, name: &str, lines: &[String]) -> io::Result<()> {
+    use std::io::BufWriter;
+
+    write_private_dump(directory, name, |file| {
+        let mut buffered = BufWriter::new(file);
+        for line in lines {
+            writeln!(buffered, "{line}")?;
+        }
+        buffered.flush()
+    })
 }
 
 #[cfg(unix)]
