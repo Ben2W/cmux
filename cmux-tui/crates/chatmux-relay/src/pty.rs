@@ -2334,10 +2334,12 @@ impl Inner {
         if context.cancellation.is_cancelled() {
             if detach_supported {
                 if let Some(lease) = lease.as_deref() {
-                    let _ = control.send(
-                        "detach-attached-view",
-                        json!({ "surface": surface_id, "lease": lease }),
-                    );
+                    let _ = control
+                        .send_reliable(
+                            "detach-attached-view",
+                            json!({ "surface": surface_id, "lease": lease }),
+                        )
+                        .await;
                 }
             }
             self.end_control_if_unshared(&control);
