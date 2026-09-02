@@ -74,11 +74,14 @@ fn retry_accept_os_error(error: &std::io::Error) -> bool {
 #[derive(Debug, PartialEq, Eq)]
 enum AcceptErrorAction {
     Retry,
+    Shutdown,
     Terminate,
 }
 
 fn accept_error_action(error: &std::io::Error, shutting_down: bool) -> AcceptErrorAction {
-    if shutting_down || !retry_accept_os_error(error) {
+    if shutting_down {
+        AcceptErrorAction::Shutdown
+    } else if !retry_accept_os_error(error) {
         AcceptErrorAction::Terminate
     } else {
         AcceptErrorAction::Retry
@@ -5497,6 +5500,12 @@ pub fn serve_paused(mux: Arc<Mux>, path: Option<PathBuf>) -> anyhow::Result<Pend
             let stream = match listener.accept_with_wake(&server_wake) {
                 Ok(Some(stream)) => stream,
                 Ok(None) => break,
+                Err(error)
+                    if accept_error_action(&error, server_shutdown.load(Ordering::Acquire))
+                        == AcceptErrorAction::Shutdown =>
+                {
+                    break;
+                }
                 Err(error)
                     if accept_error_action(&error, server_shutdown.load(Ordering::Acquire))
                         == AcceptErrorAction::Retry =>
