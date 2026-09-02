@@ -17118,6 +17118,7 @@ impl App {
                 };
                 Some((generation, generation_anchor_range, range))
             })
+            .flatten()
         else {
             self.clear_selection_for_semantic_gesture(surface, mode);
             self.semantic_selection_cache = None;
