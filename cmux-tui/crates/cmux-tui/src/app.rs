@@ -436,8 +436,9 @@ impl OwnerReloadWorker {
         let stop = events.clone();
         let cancellation = EventCancellation::new();
         let worker_cancellation = cancellation.clone();
-        let thread =
-            std::thread::Builder::new().name("owner-config-reload".into()).spawn(move || {
+        let thread = std::thread::Builder::new()
+            .name("owner-config-reload".into())
+            .spawn(move || {
                 while !worker_cancellation.stop.load(Ordering::Acquire) {
                     let Ok(event) = events.recv() else { return };
                     if !matches!(event, MuxEvent::ConfigReloadRequested) {
@@ -453,7 +454,8 @@ impl OwnerReloadWorker {
                         return;
                     }
                 }
-            })?;
+            })
+            .flatten()?;
         Ok(Self { stop: Some(stop), cancellation, thread: Some(thread) })
     }
 
