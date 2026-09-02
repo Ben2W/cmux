@@ -41,6 +41,12 @@ struct CloudTreeRowContentView: View {
     let kind: CloudTreeNode.Kind
     var style: CloudTreeStyle = CloudTreeStyleStore.current
 
+    private static func nonEmptyTrimmed(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
     var body: some View {
         row
             .overlay(alignment: .bottom) {
@@ -102,7 +108,7 @@ struct CloudTreeRowContentView: View {
                 style: style,
                 icon: "display",
                 tint: CloudTreeIconPalette.display,
-                title: remoteView?.name?.trimmingCharacters(in: .whitespacesAndNewlines).flatMap { $0.isEmpty ? nil : $0 }
+                title: Self.nonEmptyTrimmed(remoteView?.name)
                     ?? (resource.title.isEmpty ? String(localized: "cloudTree.node.desktop", defaultValue: "Desktop") : resource.title),
                 detail: String(localized: "cloudTree.node.desktop.detail", defaultValue: "noVNC")
             )
