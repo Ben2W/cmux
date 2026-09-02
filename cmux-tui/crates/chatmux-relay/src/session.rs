@@ -549,10 +549,14 @@ pub async fn stay_online(
 
 fn save(config: &Config, config_path: &Path) -> io::Result<()> {
     if let Err(error) = save_config(config_path, config) {
-        eprintln!("Could not save the relay config: {error}");
+        eprintln!("Could not save the relay config; retrying when the relay reconnects.");
         return Err(error);
     }
     Ok(())
+}
+
+fn owner_persist_failure_message(error: &io::Error) -> String {
+    format!("Relay owner state could not be saved ({:?}); reconnecting to retry.", error.kind())
 }
 
 /// Non-Unix builds cannot allocate or attach a PTY. Keep the protocol v4
@@ -933,10 +937,7 @@ async fn relay_session(
                             state.managed,
                             owner_persist_pending,
                         ) {
-                            eprintln!(
-                                "Relay owner state could not be saved; reconnecting to retry."
-                            );
-                            eprintln!("Relay owner persistence failure: {error}");
+                            eprintln!("{}", owner_persist_failure_message(&error));
                             break Err(RelayError::transient(
                                 "Relay owner state could not be saved; reconnecting to retry.",
                             ));
