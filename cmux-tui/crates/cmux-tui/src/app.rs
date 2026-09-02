@@ -17124,13 +17124,12 @@ impl App {
             self.semantic_selection_cache = None;
             return;
         };
-        if let Some(generation) = content_generation
-            && let Some(cache) = self.semantic_selection_cache
+        if let Some(cache) = self.semantic_selection_cache
             && cache.surface == surface
             && cache.mode == mode
             && cache.anchor == anchor_point
             && cache.current == current_point
-            && cache.content_generation == generation
+            && cache.content_generation == content_generation
         {
             if let Some(range) = cache.range {
                 self.replace_selection(Some(Self::selection_from_range(surface, range)));
@@ -17164,22 +17163,18 @@ impl App {
                 range
             }
         });
-        if let Some(generation) = content_generation {
-            self.semantic_selection_cache = Some(SemanticSelectionCache {
-                surface,
-                mode,
-                anchor: anchor_point,
-                current: current_point,
-                content_generation: generation,
-                range,
-            });
-        } else {
-            self.semantic_selection_cache = None;
-        }
+        self.semantic_selection_cache = Some(SemanticSelectionCache {
+            surface,
+            mode,
+            anchor: anchor_point,
+            current: current_point,
+            content_generation,
+            range,
+        });
         if let Some(sequence) =
             self.selection_click_sequence.as_mut().filter(|sequence| sequence.surface == surface)
         {
-            if let (Some(content_generation), Some(range)) = (content_generation, range) {
+            if let Some(range) = range {
                 sequence.semantic_content_generation = Some(content_generation);
                 if mode == SelectionMode::Word {
                     let has_initial_range = sequence
