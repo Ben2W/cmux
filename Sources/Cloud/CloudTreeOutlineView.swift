@@ -415,27 +415,45 @@ struct CloudTreeOutlineView: NSViewRepresentable {
                     if case .terminal(let row) = child.kind { return row.isOpen }
                     return false
                 }), case .terminal(let openRow) = shown.kind {
-                    nodeActions.project(openRow.resource.id, .split, true)
+                    if let view = openRow.remoteView {
+                        nodeActions.projectRemoteView(openRow.resource.id, view, .split, true)
+                    } else {
+                        nodeActions.project(openRow.resource.id, .split, true)
+                    }
                 } else if let group = node.dragGroup, !group.isEmpty {
                     nodeActions.openGroupAsWorkspace(machine, group, workspace.id)
                 }
             case .localWorkspace(let row):
                 nodeActions.selectLocalWorkspace(row.workspaceID)
             case .terminal(let row):
-                nodeActions.project(row.resource.id, .split, true)
-            case .display(let resource, let openIn):
+                if let view = row.remoteView {
+                    nodeActions.projectRemoteView(row.resource.id, view, .split, true)
+                } else {
+                    nodeActions.project(row.resource.id, .split, true)
+                }
+            case .display(let resource, let openIn, let remoteView):
                 // A workspace's Desktop row opens INSIDE the local workspace showing
                 // that remote workspace — never a jump to a VNC pane in a different
                 // workspace. Pool rows (openIn == nil) keep the global open-or-focus.
                 if let openIn {
-                    nodeActions.projectInLocalWorkspace(resource.id, openIn)
+                    if let remoteView {
+                        nodeActions.projectRemoteViewInLocalWorkspace(resource.id, remoteView, openIn)
+                    } else {
+                        nodeActions.projectInLocalWorkspace(resource.id, openIn)
+                    }
+                } else if let remoteView {
+                    nodeActions.projectRemoteView(resource.id, remoteView, .split, true)
                 } else {
                     nodeActions.project(resource.id, .split, true)
                 }
             case .port(let resource):
                 nodeActions.project(resource.id, .split, true)
             case .browser(let row):
-                nodeActions.project(row.resource.id, .split, true)
+                if let view = row.remoteView {
+                    nodeActions.projectRemoteView(row.resource.id, view, .split, true)
+                } else {
+                    nodeActions.project(row.resource.id, .split, true)
+                }
             case .placeholder(let machineID, let placeholder):
                 // "Asleep — open to wake": a fresh terminal on the machine is what wakes it.
                 if placeholder.style == .dimmed, let machine = machine(id: machineID) {
@@ -587,21 +605,30 @@ struct CloudTreeOutlineView: NSViewRepresentable {
                 }
                 return items
             case .terminal(let row):
-                var items = resourceMenuItems(row.resource, isLocal: row.resource.machine.isLocal)
+                var items = resourceMenuItems(row.resource, isLocal: row.resource.machine.isLocal, remoteView: row.remoteView)
                 if !row.resource.machine.isLocal {
                     items.append(.separator())
                     // The name rides the terminal's daemon tab, so a zero-view pool
                     // terminal has nothing to rename until it is projected somewhere.
-                    if row.resource.remoteViews?.isEmpty == false {
-                        items.append(item(String(localized: "cloudTree.menu.renameTerminal", defaultValue: "Rename\u{2026}")) { [nodeActions] in nodeActions.renameTerminal(row.resource) })
+                    if row.remoteView != nil {
+                        items.append(item(String(localized: "cloudTree.menu.renameTerminal", defaultValue: "Rename\u{2026}")) { [nodeActions] in nodeActions.renameTerminal(row.resource, row.remoteView) })
                     }
                     items.append(item(String(localized: "cloudTree.menu.killTerminal", defaultValue: "Kill Terminal\u{2026}")) { [nodeActions] in nodeActions.closeTerminal(row.resource.id) })
                 }
                 return items
             case .browser(let row):
-                return resourceMenuItems(row.resource, isLocal: row.resource.machine.isLocal)
-            case .display(let resource, let openIn):
-                return resourceMenuItems(resource, isLocal: false, openInLocalWorkspace: openIn)
+                return resourceMenuItems(
+                    row.resource,
+                    isLocal: row.resource.machine.isLocal,
+                    remoteView: row.remoteView
+                )
+            case .display(let resource, let openIn, let remoteView):
+                return resourceMenuItems(
+                    resource,
+                    isLocal: false,
+                    openInLocalWorkspace: openIn,
+                    remoteView: remoteView
+                )
             case .port(let resource):
                 return resourceMenuItems(resource, isLocal: false)
             case .browsersGroup, .portsGroup:
@@ -617,20 +644,43 @@ struct CloudTreeOutlineView: NSViewRepresentable {
         /// The verbs every surface row shares: open (reusing an open pane), open as a
         /// tab, a second pane (cloud resources only — a local terminal has one pane),
         /// and copying the resource id agents use with `cmux vm open`.
-        private func resourceMenuItems(_ resource: SurfaceResource, isLocal: Bool, openInLocalWorkspace: UUID? = nil) -> [NSMenuItem] {
+        private func resourceMenuItems(
+            _ resource: SurfaceResource,
+            isLocal: Bool,
+            openInLocalWorkspace: UUID? = nil,
+            remoteView: SurfaceRemoteView? = nil
+        ) -> [NSMenuItem] {
             var items: [NSMenuItem] = [
                 item(String(localized: "cloudTree.menu.open", defaultValue: "Open")) { [nodeActions] in
                     // Same scope rule as the row's open verb (one shared path).
                     if let openInLocalWorkspace {
-                        nodeActions.projectInLocalWorkspace(resource.id, openInLocalWorkspace)
+                        if let remoteView {
+                            nodeActions.projectRemoteViewInLocalWorkspace(resource.id, remoteView, openInLocalWorkspace)
+                        } else {
+                            nodeActions.projectInLocalWorkspace(resource.id, openInLocalWorkspace)
+                        }
+                    } else if let remoteView {
+                        nodeActions.projectRemoteView(resource.id, remoteView, .split, true)
                     } else {
                         nodeActions.project(resource.id, .split, true)
                     }
                 },
-                item(String(localized: "cloudTree.menu.openInNewTab", defaultValue: "Open in New Tab")) { [nodeActions] in nodeActions.project(resource.id, .tab, true) },
+                item(String(localized: "cloudTree.menu.openInNewTab", defaultValue: "Open in New Tab")) { [nodeActions] in
+                    if let remoteView {
+                        nodeActions.projectRemoteView(resource.id, remoteView, .tab, true)
+                    } else {
+                        nodeActions.project(resource.id, .tab, true)
+                    }
+                },
             ]
             if !isLocal {
-                items.append(item(String(localized: "cloudTree.menu.openInNewPane", defaultValue: "Open in New Pane")) { [nodeActions] in nodeActions.project(resource.id, .split, false) })
+                items.append(item(String(localized: "cloudTree.menu.openInNewPane", defaultValue: "Open in New Pane")) { [nodeActions] in
+                    if let remoteView {
+                        nodeActions.projectRemoteView(resource.id, remoteView, .split, false)
+                    } else {
+                        nodeActions.project(resource.id, .split, false)
+                    }
+                })
             }
             items.append(.separator())
             if let port = resource.port, resource.kind == .browser {

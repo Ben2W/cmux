@@ -8,10 +8,17 @@ import Foundation
 struct CloudTreeNodeActions {
     /// Project a resource into the selected local workspace.
     let project: @MainActor (_ resource: SurfaceResourceID, _ placement: SurfacePlacement, _ reuseExisting: Bool) -> Void
+    /// Project a resource while retaining the exact daemon tab placement that
+    /// produced the row. This prevents a multi-view terminal from losing its
+    /// rename target during materialization.
+    let projectRemoteView: @MainActor (_ resource: SurfaceResourceID, _ view: SurfaceRemoteView, _ placement: SurfacePlacement, _ reuseExisting: Bool) -> Void
     /// Project a resource into ONE local workspace, reusing only a pane already in it
     /// (a workspace's own Desktop row: a VNC pane in another workspace neither
     /// satisfies the open nor steals focus).
     let projectInLocalWorkspace: @MainActor (_ resource: SurfaceResourceID, _ workspaceID: UUID) -> Void
+    /// Project an exact remote placement into one local workspace, preserving the
+    /// daemon tab identity while narrowing reuse to that workspace.
+    let projectRemoteViewInLocalWorkspace: @MainActor (_ resource: SurfaceResourceID, _ view: SurfaceRemoteView, _ workspaceID: UUID) -> Void
     /// Start a plain terminal on a machine (in a cmux-tui workspace when given) and show it.
     let newTerminal: @MainActor (_ machine: SurfaceMachineID, _ remoteWorkspaceID: String?) -> Void
     /// Open a whole group (a workspace's terminals and browsers): the first at the
@@ -34,9 +41,10 @@ struct CloudTreeNodeActions {
     let closeWorkspace: @MainActor (_ machine: SurfaceMachineID, _ workspace: SurfaceRemoteWorkspace) -> Void
     /// Rename a remote workspace via a text prompt.
     let renameWorkspace: @MainActor (_ machine: SurfaceMachineID, _ workspace: SurfaceRemoteWorkspace) -> Void
-    /// Rename a remote terminal via a text prompt (sets its daemon tab name; the PTY
-    /// title stays the fallback for unnamed terminals).
-    let renameTerminal: @MainActor (_ resource: SurfaceResource) -> Void
+    /// Rename a remote terminal placement via a text prompt. A nil view means the
+    /// caller selected the machine pool, so the explicit compatibility operation
+    /// renames all views.
+    let renameTerminal: @MainActor (_ resource: SurfaceResource, _ view: SurfaceRemoteView?) -> Void
     /// Select a local workspace.
     let selectLocalWorkspace: @MainActor (_ workspaceID: UUID) -> Void
     let copyToPasteboard: @MainActor (_ text: String) -> Void
@@ -90,6 +98,17 @@ struct CloudTreeNodeActions {
                     _ = try await catalog.project(resource, into: try destination(placement), focus: true, reuseExisting: reuseExisting)
                 }
             },
+            projectRemoteView: { resource, view, placement, reuseExisting in
+                run(openingLabel(resource.machine)) { catalog in
+                    _ = try await catalog.project(
+                        resource,
+                        into: try destination(placement),
+                        focus: true,
+                        reuseExisting: reuseExisting,
+                        remoteView: view
+                    )
+                }
+            },
             projectInLocalWorkspace: { resource, workspaceID in
                 run(openingLabel(resource.machine)) { catalog in
                     _ = try await catalog.project(
@@ -101,11 +120,29 @@ struct CloudTreeNodeActions {
                     )
                 }
             },
+            projectRemoteViewInLocalWorkspace: { resource, view, workspaceID in
+                run(openingLabel(resource.machine)) { catalog in
+                    _ = try await catalog.project(
+                        resource,
+                        into: .workspace(id: workspaceID, placement: .split),
+                        focus: true,
+                        reuseExisting: true,
+                        reuseInWorkspace: workspaceID,
+                        remoteView: view
+                    )
+                }
+            },
             newTerminal: { machine, remoteWorkspaceID in
                 run(startingLabel(machine)) { catalog in
                     guard let provider = catalog.provider(for: machine) else { throw SurfaceCatalogError.noProvider(machine) }
                     let resource = try await provider.createTerminal(command: nil, cwd: nil, name: nil, remoteWorkspaceID: remoteWorkspaceID)
-                    _ = try await catalog.project(resource.id, into: try destination(.split), focus: true, reuseExisting: true)
+                    _ = try await catalog.project(
+                        resource.id,
+                        into: try destination(.split),
+                        focus: true,
+                        reuseExisting: true,
+                        remoteView: Self.uniqueRemoteView(resource)
+                    )
                 }
             },
             openGroup: { machine, group, placement, remoteWorkspaceID in
@@ -113,11 +150,22 @@ struct CloudTreeNodeActions {
                     run(startingLabel(machine)) { catalog in
                         guard let provider = catalog.provider(for: machine) else { throw SurfaceCatalogError.noProvider(machine) }
                         let resource = try await provider.createTerminal(command: nil, cwd: nil, name: nil, remoteWorkspaceID: remoteWorkspaceID)
-                        _ = try await catalog.project(resource.id, into: try destination(.split), focus: true, reuseExisting: true)
+                        _ = try await catalog.project(
+                            resource.id,
+                            into: try destination(.split),
+                            focus: true,
+                            reuseExisting: true,
+                            remoteView: Self.uniqueRemoteView(resource)
+                        )
                     }
                 } else {
                     run(openingLabel(machine)) { catalog in
-                        _ = try await catalog.projectGroup(group.resources, into: try destination(placement), focus: true)
+                        let routedGroup = group.withRemoteWorkspaceID(remoteWorkspaceID)
+                        _ = try await catalog.projectGroup(
+                            routedGroup,
+                            into: try destination(placement),
+                            focus: true
+                        )
                     }
                 }
             },
@@ -127,20 +175,35 @@ struct CloudTreeNodeActions {
                         guard let provider = catalog.provider(for: machine) else { throw SurfaceCatalogError.noProvider(machine) }
                         let resource = try await provider.createTerminal(command: nil, cwd: nil, name: nil, remoteWorkspaceID: remoteWorkspaceID)
                         let opened = try await catalog.projectGroupAsNewLocalWorkspace(
-                            [resource.id], title: Self.localWorkspaceTitle(machine: machine, group: group), focus: true, host: .app
+                            SurfaceResourceGroup(
+                                title: Self.localWorkspaceTitle(machine: machine, group: group),
+                                placements: [SurfaceResourcePlacement(resource: resource.id, remoteView: Self.uniqueRemoteView(resource))],
+                                remoteWorkspaceID: remoteWorkspaceID ?? group.remoteWorkspaceID
+                            ),
+                            title: Self.localWorkspaceTitle(machine: machine, group: group),
+                            focus: true,
+                            host: .app
                         )
                         CloudWorkspaceRenameWriteThrough.bind(
                             localWorkspaceID: opened.workspaceID, machine: machine,
-                            remoteWorkspaceID: resource.remoteWorkspace?.id ?? remoteWorkspaceID
+                            remoteWorkspaceID: resource.remoteWorkspace?.id ?? remoteWorkspaceID,
+                            generatedTitle: Self.localWorkspaceTitle(machine: machine, group: group)
                         )
                     }
                 } else {
                     run(openingLabel(machine)) { catalog in
+                        let routedGroup = group.withRemoteWorkspaceID(remoteWorkspaceID)
                         let opened = try await catalog.projectGroupAsNewLocalWorkspace(
-                            group.resources, title: Self.localWorkspaceTitle(machine: machine, group: group), focus: true, host: .app
+                            routedGroup,
+                            title: Self.localWorkspaceTitle(machine: machine, group: group),
+                            focus: true,
+                            host: .app
                         )
                         CloudWorkspaceRenameWriteThrough.bind(
-                            localWorkspaceID: opened.workspaceID, machine: machine, remoteWorkspaceID: remoteWorkspaceID
+                            localWorkspaceID: opened.workspaceID,
+                            machine: machine,
+                            remoteWorkspaceID: remoteWorkspaceID,
+                            generatedTitle: Self.localWorkspaceTitle(machine: machine, group: group)
                         )
                     }
                 }
@@ -191,15 +254,19 @@ struct CloudTreeNodeActions {
                     try await provider.renameRemoteWorkspace(id: workspace.id, name: name)
                 }
             },
-            renameTerminal: { resource in
-                let current = resource.title.isEmpty ? resource.id.key : resource.title
+            renameTerminal: { resource, view in
+                let current = view?.name ?? (resource.title.isEmpty ? resource.id.key : resource.title)
                 guard let name = promptForName(
                     title: String(format: String(localized: "cloudTree.renameTerminal.title", defaultValue: "Rename \u{201C}%@\u{201D}"), current),
-                    current: resource.title
-                ), name != resource.title else { return }
+                    current: current
+                ), name != current else { return }
                 run(String(format: String(localized: "cloudTree.operation.renameTerminal", defaultValue: "Renaming %@\u{2026}"), current)) { catalog in
                     guard let provider = catalog.provider(for: resource.machine) else { throw SurfaceCatalogError.noProvider(resource.machine) }
-                    try await provider.renameTerminal(resource.id, name: name)
+                    if let view {
+                        try await provider.renameRemoteTab(id: view.tabID, name: name)
+                    } else {
+                        try await provider.renameTerminal(resource.id, name: name)
+                    }
                 }
             },
             selectLocalWorkspace: selectLocalWorkspace,
@@ -247,15 +314,27 @@ struct CloudTreeNodeActions {
         } else {
             terminal = try await provider.createTerminal(command: nil, cwd: nil, name: nil, remoteWorkspaceID: workspace.id)
         }
-        let group = SurfaceResourceGroup(title: workspace.name, resources: [terminal.id])
+        let placement = SurfaceResourcePlacement(
+            resource: terminal.id,
+            remoteView: terminal.remoteViews?.first { $0.workspace.id == workspace.id },
+            remoteWorkspaceID: workspace.id
+        )
+        let group = SurfaceResourceGroup(
+            title: workspace.name,
+            placements: [placement],
+            remoteWorkspaceID: workspace.id
+        )
         let opened = try await catalog.projectGroupAsNewLocalWorkspace(
-            group.resources,
+            group,
             title: localWorkspaceTitle(machine: machine, group: group),
             focus: focus,
             host: .app
         )
         CloudWorkspaceRenameWriteThrough.bind(
-            localWorkspaceID: opened.workspaceID, machine: machine, remoteWorkspaceID: workspace.id
+            localWorkspaceID: opened.workspaceID,
+            machine: machine,
+            remoteWorkspaceID: workspace.id,
+            generatedTitle: localWorkspaceTitle(machine: machine, group: group)
         )
         return (workspace, terminal, opened)
     }
@@ -313,5 +392,13 @@ struct CloudTreeNodeActions {
         guard alert.runModal() == .alertFirstButtonReturn else { return nil }
         let name = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         return name.isEmpty ? nil : name
+    }
+
+    /// A create operation returns the exact tab receipt. A newly-created
+    /// resource should carry that receipt into projection, while a missing or
+    /// multi-view receipt must remain explicit and use catalog resolution.
+    private static func uniqueRemoteView(_ resource: SurfaceResource) -> SurfaceRemoteView? {
+        guard resource.remoteViews?.count == 1 else { return nil }
+        return resource.remoteViews?.first
     }
 }
