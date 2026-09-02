@@ -2385,16 +2385,6 @@ impl SurfaceHandle {
         }
     }
 
-    pub fn content_generation_nonblocking(&self) -> Option<u64> {
-        match self {
-            SurfaceHandle::Local(surface, _) => surface.content_generation_nonblocking(),
-            SurfaceHandle::Remote(surface, _) if surface.kind == SurfaceKind::Pty => {
-                Some(surface.content_generation.load(Ordering::Acquire))
-            }
-            SurfaceHandle::Remote(_, _) | SurfaceHandle::RemoteBrowserUnsupported => None,
-        }
-    }
-
     pub fn scroll_delta(&self, delta: isize) -> Option<bool> {
         match self {
             SurfaceHandle::Local(surface, _) => {

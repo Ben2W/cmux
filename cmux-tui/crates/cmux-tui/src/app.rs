@@ -16866,7 +16866,11 @@ impl App {
         let handle = self.session.surface(surface)?;
         match handle.try_pointer_snapshot()? {
             PointerSnapshotProbe::Ready(snapshot) => Some(snapshot.content_generation),
-            PointerSnapshotProbe::Contended => handle.content_generation_nonblocking(),
+            // Keep the generation paired with the terminal snapshot. A
+            // contended lock means output may advance before the gesture can
+            // read its semantic range, so defer repeat handling until the
+            // next input instead of accepting a stale generation.
+            PointerSnapshotProbe::Contended => None,
         }
     }
 
