@@ -436,9 +436,8 @@ impl OwnerReloadWorker {
         let stop = events.clone();
         let cancellation = EventCancellation::new();
         let worker_cancellation = cancellation.clone();
-        let thread = std::thread::Builder::new()
-            .name("owner-config-reload".into())
-            .spawn(move || {
+        let thread =
+            std::thread::Builder::new().name("owner-config-reload".into()).spawn(move || {
                 while !worker_cancellation.stop.load(Ordering::Acquire) {
                     let Ok(event) = events.recv() else { return };
                     if !matches!(event, MuxEvent::ConfigReloadRequested) {
@@ -454,8 +453,7 @@ impl OwnerReloadWorker {
                         return;
                     }
                 }
-            })
-            .flatten()?;
+            })?;
         Ok(Self { stop: Some(stop), cancellation, thread: Some(thread) })
     }
 
@@ -16844,8 +16842,8 @@ impl App {
         }
         let point = Self::selection_point(cell)?;
         let handle = self.session.surface(surface)?;
-        let (range, content_generation) =
-            handle.with_terminal_and_generation(|terminal, generation| {
+        let (range, content_generation) = handle
+            .with_terminal_and_generation(|terminal, generation| {
                 let point = terminal.normalize_selection_point_screen(point)?;
                 let range = match mode {
                     SelectionMode::Word => terminal.select_word_screen(point).ok().flatten(),
@@ -16857,7 +16855,8 @@ impl App {
                     SelectionMode::Cell => None,
                 };
                 (range, generation)
-            })?;
+            })
+            .flatten()?;
         let range = range?;
         Some((Self::selection_from_range(surface, range), Some(content_generation)))
     }
