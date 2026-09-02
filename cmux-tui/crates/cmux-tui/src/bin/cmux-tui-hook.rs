@@ -93,12 +93,18 @@ fn run(args: Args, started: Instant) -> anyhow::Result<()> {
     )?;
     let event = serde_json::to_value(ingress)?;
     let (request_id, encoded) = encode_request(event)?;
-    let deadline = started + handoff_budget(&args.source, &args.native_event);
+    let deadline = (args.source == "codex" && args.native_event == "SessionEnd")
+        .then(|| started + handoff_budget(&args.source, &args.native_event));
     match detach::append_detached(&socket, &request_id, &encoded, deadline)? {
         Handoff::Sent => Ok(()),
         Handoff::ChildExited => bail!("hook child gave up before writing the journal request"),
         Handoff::TimedOut => {
-            bail!("journal request handoff was not confirmed within {} ms", handoff.as_millis())
+            bail!(
+                "journal request handoff was not confirmed before its deadline ({} ms remaining)",
+                deadline.map_or(0, |deadline| deadline
+                    .saturating_duration_since(Instant::now())
+                    .as_millis())
+            )
         }
     }
 }
@@ -643,7 +649,7 @@ mod detach {
         socket: &Path,
         request_id: &str,
         encoded: &[u8],
-        deadline: std::time::Instant,
+        deadline: Option<std::time::Instant>,
     ) -> anyhow::Result<Handoff> {
         use std::os::unix::process::CommandExt;
         let exe = std::env::current_exe().context("locate hook helper")?;
@@ -669,7 +675,7 @@ mod detach {
         let encoded = encoded.to_owned();
         std::thread::spawn(move || {
             let result =
-                (|| -> anyhow::Result<(std::process::Child, std::process::ChildStdout)> {
+                (|| -> anyhow::Result<(super::DetachedChildGuard, std::process::ChildStdout)> {
                     let mut child = super::DetachedChildGuard::new(
                         command.spawn().context("spawn detached hook child")?,
                     );
@@ -688,17 +694,22 @@ mod detach {
                         .stdout
                         .take()
                         .context("detached hook child has no stdout")?;
-                    Ok((child.0.take().expect("child guard occupied"), stdout))
+                    Ok((child, stdout))
                 })();
             let _ = sender.send(result);
         });
-        let (raw_child, mut stdout) = match receiver
-            .recv_timeout(deadline.saturating_duration_since(std::time::Instant::now()))
-        {
+        let setup = || {
+            deadline.map_or(None, |deadline| {
+                Some(deadline.saturating_duration_since(std::time::Instant::now()))
+            })
+        };
+        let (mut child, mut stdout) = match match setup() {
+            Some(remaining) => receiver.recv_timeout(remaining).map_err(|_| ()),
+            None => receiver.recv().map_err(|_| ()),
+        } {
             Ok(result) => result?,
             Err(_) => return Ok(Handoff::TimedOut),
         };
-        let mut child = super::DetachedChildGuard::new(raw_child);
         let (sender, receiver) = mpsc::channel();
         let reader = std::thread::spawn(move || {
             let mut byte = [0_u8; 1];
@@ -709,7 +720,9 @@ mod detach {
             let _ = sender.send(outcome);
         });
         let outcome = receiver
-            .recv_timeout(deadline.saturating_duration_since(std::time::Instant::now()))
+            .recv_timeout(deadline.map_or(Duration::from_secs(5), |deadline| {
+                deadline.saturating_duration_since(std::time::Instant::now())
+            }))
             .unwrap_or(Handoff::TimedOut);
         super::settle_detached_child(child, reader);
         Ok(outcome)
@@ -736,7 +749,7 @@ mod detach {
         socket: &Path,
         request_id: &str,
         encoded: &[u8],
-        deadline: std::time::Instant,
+        deadline: Option<std::time::Instant>,
     ) -> anyhow::Result<Handoff> {
         use std::os::windows::process::CommandExt;
         const DETACHED_PROCESS: u32 = 0x0000_0008;
@@ -773,9 +786,14 @@ mod detach {
             };
             let _ = sender.send(outcome);
         });
-        let outcome = receiver
-            .recv_timeout(deadline.saturating_duration_since(std::time::Instant::now()))
-            .unwrap_or(Handoff::TimedOut);
+        let outcome = deadline.map_or_else(
+            || receiver.recv().unwrap_or(Handoff::TimedOut),
+            |deadline| {
+                receiver
+                    .recv_timeout(deadline.saturating_duration_since(std::time::Instant::now()))
+                    .unwrap_or(Handoff::TimedOut)
+            },
+        );
         super::settle_detached_child(child, reader);
         Ok(outcome)
     }
