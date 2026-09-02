@@ -2855,6 +2855,7 @@ class TerminalController {
             "vm.terminal_open",
             "vm.terminal_new",
             "vm.terminal_rename",
+            "vm.tab_rename",
             "vm.workspace_new",
             "vm.workspace_open",
             "vm.workspace_close",
